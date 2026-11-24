@@ -18,7 +18,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import { PhotoCategory, PhotoEvidence, GpsLocation } from '@/types';
+import { Installation, PhotoCategory, PhotoEvidence, GpsLocation } from '@/types';
+import { stepBlocker, missingItems, panelsDone, photosDone } from '@/lib/installationSteps';
 
 const PHOTO_GUIDES: Record<PhotoCategory, { title: string; hint: string; sampleUrl: string }> = {
   front: {
@@ -74,8 +75,8 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
     removePhotoFromDraft,
     setGpsToDraft,
     submitInstallationDraft,
-    inventory,
     isOnline,
+    recordManualSerial,
   } = useApp();
 
   const [scanModal, setScanModal] = useState<{ open: boolean; type: 'panel' | 'inverter'; index?: number }>({
@@ -92,8 +93,10 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
   const [reportDetailsModal, setReportDetailsModal] = useState(false);
   const [reportNote, setReportNote] = useState('');
   const [submitResult, setSubmitResult] = useState<{ success: boolean; isOffline: boolean; message: string } | null>(null);
+  // The draft is cleared on submit, so keep a copy for the confirmation screen.
+  const [submittedDraft, setSubmittedDraft] = useState<Installation | null>(null);
 
-  if (!installerDraft) {
+  if (!installerDraft && !(submitResult && submittedDraft)) {
     return (
       <div className="p-6 text-center text-slate-600">
         <p>No active installation in progress.</p>
@@ -104,7 +107,10 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
     );
   }
 
-  const currentConsumer = consumers.find((c) => c.consumerNumber === installerDraft.consumerNumber);
+  const draft = (installerDraft ?? submittedDraft)!;
+  const currentConsumer = consumers.find((c) => c.consumerNumber === draft.consumerNumber);
+  const blocker = stepBlocker(draft, activeStep);
+  const missing = missingItems(draft);
 
   // Helper step indicators
   const stepTitles = [
@@ -118,28 +124,40 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
   ];
 
   // Scan handler
-  const handleExecuteScan = (serial: string) => {
+  const closeScanModal = () => {
+    setScanModal({ open: false, type: 'panel' });
+    setScanFeedback(null);
+    setManualInput('');
+    setManualReason('');
+    setShowManualFallback(false);
+  };
+
+  const handleManualSave = () => {
+    if (!manualInput.trim()) {
+      setScanFeedback({ text: 'Please type the number from the label.', success: false });
+      return;
+    }
+    if (!manualReason.trim()) {
+      setScanFeedback({ text: 'Please say why you are typing the number (for example: label scratched).', success: false });
+      return;
+    }
+    const ok = handleExecuteScan(manualInput);
+    if (ok) recordManualSerial(manualInput.trim().toUpperCase(), manualReason.trim());
+  };
+
+  const handleExecuteScan = (serial: string): boolean => {
     if (scanModal.type === 'panel' && scanModal.index !== undefined) {
       const res = scanPanel(scanModal.index, serial);
       setScanFeedback({ text: res.message, success: res.success });
-      if (res.success) {
-        setTimeout(() => {
-          setScanModal({ open: false, type: 'panel' });
-          setScanFeedback(null);
-          setManualInput('');
-        }, 800);
-      }
+      if (res.success) setTimeout(closeScanModal, 800);
+      return res.success;
     } else if (scanModal.type === 'inverter') {
       const res = scanInverter(serial);
       setScanFeedback({ text: res.message, success: res.success });
-      if (res.success) {
-        setTimeout(() => {
-          setScanModal({ open: false, type: 'inverter' });
-          setScanFeedback(null);
-          setManualInput('');
-        }, 800);
-      }
+      if (res.success) setTimeout(closeScanModal, 800);
+      return res.success;
     }
+    return false;
   };
 
   // Photo capture simulator
@@ -203,7 +221,7 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
               <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 space-y-1.5 text-xs">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Consumer No:</span>
-                  <span className="font-mono font-bold text-slate-900">{installerDraft.consumerNumber}</span>
+                  <span className="font-mono font-bold text-slate-900">{draft.consumerNumber}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Beneficiary:</span>
@@ -267,9 +285,9 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
                 </div>
               </div>
 
-              {installerDraft.reportedIncorrectDetails && (
+              {draft.reportedIncorrectDetails && (
                 <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">
-                  <span className="font-bold">Reported Mismatch:</span> {installerDraft.reportedIncorrectDetails}
+                  <span className="font-bold">Reported Mismatch:</span> {draft.reportedIncorrectDetails}
                 </div>
               )}
 
@@ -288,12 +306,12 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
                     setDraftStep(3);
                   }}
                   className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold text-white transition-colors ${
-                    installerDraft.consumerConfirmed
+                    draft.consumerConfirmed
                       ? 'bg-emerald-600 hover:bg-emerald-700'
                       : 'bg-brand-600 hover:bg-brand-700'
                   }`}
                 >
-                  {installerDraft.consumerConfirmed ? '✓ Confirmed' : 'Confirm & Proceed'}
+                  {draft.consumerConfirmed ? '✓ Confirmed' : 'Confirm & Proceed'}
                 </button>
               </div>
             </div>
@@ -309,13 +327,13 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
                 <p className="text-xs text-slate-500">Validate each barcode against approved inventory.</p>
               </div>
               <span className="text-xs font-bold bg-brand-50 text-brand-700 px-2 py-1 rounded">
-                {installerDraft.panels.filter((p) => p.trim() !== '').length} / 4 Scanned
+                {draft.panels.filter((p) => p.trim() !== '').length} / 4 Scanned
               </span>
             </div>
 
             <div className="space-y-2.5">
               {[0, 1, 2, 3].map((idx) => {
-                const serial = installerDraft.panels[idx];
+                const serial = draft.panels[idx];
                 const isScanned = serial && serial.trim() !== '';
                 return (
                   <div
@@ -386,7 +404,7 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
 
             <div
               className={`p-4 rounded-xl border ${
-                installerDraft.inverterSerial
+                draft.inverterSerial
                   ? 'bg-emerald-50/60 border-emerald-300 shadow-sm'
                   : 'bg-white border-slate-200 shadow-sm'
               }`}
@@ -395,16 +413,16 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
                 <div className="flex items-center gap-3">
                   <div
                     className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm ${
-                      installerDraft.inverterSerial ? 'bg-emerald-600 text-white' : 'bg-brand-100 text-brand-700'
+                      draft.inverterSerial ? 'bg-emerald-600 text-white' : 'bg-brand-100 text-brand-700'
                     }`}
                   >
-                    {installerDraft.inverterSerial ? '✓' : 'INV'}
+                    {draft.inverterSerial ? '✓' : 'INV'}
                   </div>
                   <div>
                     <div className="text-xs font-bold text-slate-800">Central Solar Inverter</div>
-                    {installerDraft.inverterSerial ? (
+                    {draft.inverterSerial ? (
                       <div className="text-xs font-mono font-bold text-emerald-800">
-                        {installerDraft.inverterSerial}
+                        {draft.inverterSerial}
                       </div>
                     ) : (
                       <div className="text-[11px] text-slate-400">Requires 1 valid serial</div>
@@ -419,17 +437,17 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
                     setScanModal({ open: true, type: 'inverter' });
                   }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm ${
-                    installerDraft.inverterSerial
+                    draft.inverterSerial
                       ? 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
                       : 'bg-brand-600 text-white hover:bg-brand-700'
                   }`}
                 >
                   <QrCode className="w-3.5 h-3.5" />
-                  <span>{installerDraft.inverterSerial ? 'Rescan' : 'Scan Inverter'}</span>
+                  <span>{draft.inverterSerial ? 'Rescan' : 'Scan Inverter'}</span>
                 </button>
               </div>
 
-              {installerDraft.inverterSerial && (
+              {draft.inverterSerial && (
                 <div className="text-[11px] text-emerald-700 bg-emerald-100/50 p-2 rounded border border-emerald-200">
                   ✓ Validated against warehouse batch stock (Havells / Sungrow Approved Series).
                 </div>
@@ -447,14 +465,14 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
                 <p className="text-xs text-slate-500">Capture clear, unblurred evidence for MNRE approval.</p>
               </div>
               <span className="text-xs font-bold bg-brand-50 text-brand-700 px-2 py-1 rounded">
-                {Object.keys(installerDraft.photos).length} / 7
+                {Object.keys(draft.photos).length} / 7
               </span>
             </div>
 
             <div className="space-y-2.5">
               {(Object.keys(PHOTO_GUIDES) as PhotoCategory[]).map((cat, idx) => {
                 const guide = PHOTO_GUIDES[cat];
-                const photo = installerDraft.photos[cat];
+                const photo = draft.photos[cat];
                 const isCaptured = !!photo;
 
                 return (
@@ -531,14 +549,14 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
             </div>
 
             <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200 space-y-3">
-              {installerDraft.gps ? (
+              {draft.gps ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200 text-xs">
                     <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
                     <div>
                       <div className="font-bold">GPS Coordinates Locked</div>
                       <div className="text-[11px] text-emerald-600">
-                        Accuracy: {installerDraft.gps.accuracy} meters (Threshold &lt; 15m)
+                        Accuracy: {draft.gps.accuracy} meters (Threshold &lt; 15m)
                       </div>
                     </div>
                   </div>
@@ -546,19 +564,19 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
                   <div className="p-3 bg-slate-50 rounded-lg text-xs space-y-1.5 font-mono">
                     <div className="flex justify-between">
                       <span className="text-slate-500 font-sans">Latitude:</span>
-                      <span className="font-bold text-slate-800">{installerDraft.gps.latitude.toFixed(6)}° N</span>
+                      <span className="font-bold text-slate-800">{draft.gps.latitude.toFixed(6)}° N</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500 font-sans">Longitude:</span>
-                      <span className="font-bold text-slate-800">{installerDraft.gps.longitude.toFixed(6)}° E</span>
+                      <span className="font-bold text-slate-800">{draft.gps.longitude.toFixed(6)}° E</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500 font-sans">Timestamp:</span>
-                      <span className="text-slate-700">{installerDraft.gps.capturedAt}</span>
+                      <span className="text-slate-700">{draft.gps.capturedAt}</span>
                     </div>
                     <div className="flex justify-between font-sans pt-1 border-t border-slate-200">
                       <span className="text-slate-500">Site:</span>
-                      <span className="font-medium text-slate-800">{installerDraft.gps.address}</span>
+                      <span className="font-medium text-slate-800">{draft.gps.address}</span>
                     </div>
                   </div>
 
@@ -604,42 +622,35 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
               <p className="text-xs text-slate-500">Review all captured data before final submission.</p>
             </div>
 
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200 space-y-3 text-xs">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <span className="text-slate-600">Consumer Details Verified</span>
-                <span className="font-bold text-emerald-600 flex items-center gap-1">
-                  <CheckCircle2 className="w-4 h-4" /> Verified
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <span className="text-slate-600">Solar Panels (4 of 4)</span>
-                <span className="font-bold text-emerald-600 flex items-center gap-1">
-                  <CheckCircle2 className="w-4 h-4" /> 4 Scanned
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <span className="text-slate-600">Inverter Serial</span>
-                <span className="font-bold text-emerald-600 flex items-center gap-1">
-                  <CheckCircle2 className="w-4 h-4" /> {installerDraft.inverterSerial}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <span className="text-slate-600">Mandatory Photos (7 Categories)</span>
-                <span className="font-bold text-emerald-600 flex items-center gap-1">
-                  <CheckCircle2 className="w-4 h-4" /> {Object.keys(installerDraft.photos).length}/7 Attached
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-slate-600">Geotag Status</span>
-                <span className="font-bold text-emerald-600 flex items-center gap-1">
-                  <CheckCircle2 className="w-4 h-4" /> {installerDraft.gps?.accuracy}m Accuracy
-                </span>
-              </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200 space-y-3 text-sm">
+              {(
+                [
+                  ['Consumer details', draft.consumerConfirmed ? 'Confirmed' : 'Not confirmed', draft.consumerConfirmed],
+                  ['Panels', `${panelsDone(draft)} of 4`, panelsDone(draft) === 4],
+                  ['Inverter', draft.inverterSerial || 'Not scanned', !!draft.inverterSerial],
+                  ['Photos', `${photosDone(draft)} of 7`, photosDone(draft) === 7],
+                  ['Location', draft.gps ? `Saved (${draft.gps.accuracy} m)` : 'Not captured', !!draft.gps],
+                ] as [string, string, boolean][]
+              ).map(([label, value, ok]) => (
+                <div key={label} className="flex items-center justify-between pb-2 border-b border-slate-100 last:border-0 last:pb-0">
+                  <span className="text-slate-600">{label}</span>
+                  <span className={`font-bold flex items-center gap-1 ${ok ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {ok ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />} {value}
+                  </span>
+                </div>
+              ))}
             </div>
+
+            {missing.length > 0 && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-900">
+                <div className="font-bold mb-1">Please finish before sending:</div>
+                <ul className="list-disc pl-5">
+                  {missing.map((m) => (
+                    <li key={m}>{m}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Offline notification card */}
             {!isOnline ? (
@@ -669,6 +680,13 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
         )}
       </div>
 
+      {blocker && activeStep < 7 && (
+        <div className="bg-amber-50 border-t border-amber-200 px-4 py-2 text-sm text-amber-900 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          <span>{blocker}</span>
+        </div>
+      )}
+
       {/* Bottom Sticky Action Footer */}
       <div className="bg-white border-t border-slate-200 p-3 shadow-lg flex items-center justify-between gap-3">
         {activeStep > 1 ? (
@@ -694,19 +712,22 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
           <button
             type="button"
             onClick={() => setDraftStep(activeStep + 1)}
-            className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-bold shadow-md flex items-center justify-center gap-1.5 transition-colors"
+            disabled={!!blocker}
+            className="flex-1 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-bold shadow-md flex items-center justify-center gap-1.5 transition-colors disabled:bg-slate-300 disabled:text-slate-500"
           >
-            <span>Continue to Step {activeStep + 1}</span>
+            <span>Next</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         ) : (
           <button
             type="button"
+            disabled={missing.length > 0}
             onClick={() => {
+              setSubmittedDraft({ ...draft });
               const res = submitInstallationDraft();
               setSubmitResult(res);
             }}
-            className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-md flex items-center justify-center gap-1.5 transition-colors"
+            className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-md flex items-center justify-center gap-1.5 transition-colors disabled:bg-slate-300 disabled:text-slate-500"
           >
             <Send className="w-4 h-4" />
             <span>Submit Installation</span>
@@ -725,10 +746,8 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
               <p className="text-[11px] text-slate-300">Align barcode inside the viewfinder</p>
             </div>
             <button
-              onClick={() => {
-                setScanModal({ open: false, type: 'panel' });
-                setScanFeedback(null);
-              }}
+              onClick={closeScanModal}
+              aria-label="Close scanner"
               className="p-1.5 bg-white/10 rounded-full hover:bg-white/20"
             >
               <XCircle className="w-5 h-5 text-white" />
@@ -824,13 +843,13 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
                 onClick={() => setShowManualFallback(!showManualFallback)}
                 className="text-[11px] text-slate-400 hover:text-slate-200 underline"
               >
-                {showManualFallback ? 'Hide Manual Entry' : 'Camera damaged? Use Controlled Manual Entry'}
+                {showManualFallback ? 'Hide typing box' : "Can't scan? Type the number instead"}
               </button>
 
               {showManualFallback && (
                 <div className="mt-3 space-y-2 bg-slate-800/80 p-3 rounded-lg text-left">
                   <div className="text-[11px] text-amber-300">
-                    ⚠ Manual entry will create an auditable exception log as per policy.
+                    ⚠ Typed numbers are recorded and checked by the office.
                   </div>
                   <input
                     type="text"
@@ -843,11 +862,11 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
                     type="text"
                     value={manualReason}
                     onChange={(e) => setManualReason(e.target.value)}
-                    placeholder="Reason (e.g. Scratched QR label)"
+                    placeholder="Why are you typing it? (e.g. label scratched)"
                     className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-white placeholder-slate-500"
                   />
                   <button
-                    onClick={() => handleExecuteScan(manualInput)}
+                    onClick={handleManualSave}
                     className="w-full py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded text-xs font-bold"
                   >
                     Validate & Save Serial
@@ -964,15 +983,16 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
             </div>
 
             <div className="bg-slate-50 p-3 rounded-lg text-xs font-mono text-slate-700 text-left space-y-1">
-              <div>Consumer: {installerDraft.consumerNumber}</div>
-              <div>Panels: 4 Serial Nos Recorded</div>
-              <div>Inverter: {installerDraft.inverterSerial}</div>
-              <div>GPS Accuracy: {installerDraft.gps?.accuracy}m</div>
+              <div>Consumer: {draft.consumerNumber}</div>
+              <div>Panels: {panelsDone(draft)} of 4 recorded</div>
+              <div>Inverter: {draft.inverterSerial}</div>
+              <div>GPS Accuracy: {draft.gps?.accuracy}m</div>
             </div>
 
             <button
               onClick={() => {
                 setSubmitResult(null);
+                setSubmittedDraft(null);
                 onComplete();
               }}
               className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow-md"
