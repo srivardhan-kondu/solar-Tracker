@@ -1,5 +1,5 @@
 import 'server-only';
-import { neon } from '@neondatabase/serverless';
+import { neon, NeonQueryFunction } from '@neondatabase/serverless';
 import {
   SEED_AUDIT_LOGS,
   SEED_CONSUMERS,
@@ -13,9 +13,26 @@ import {
 } from '@/data/seedData';
 import { AllData, chronological, DbRecord, TABLE_NAMES, TableChanges, TableName, TABLES } from '@/lib/tables';
 
-const url = process.env.DATABASE_URL;
-if (!url) throw new Error('DATABASE_URL is not set');
-export const sql = neon(url);
+/**
+ * Connect only when a request needs the database, not while the app is being built.
+ * (Hosting services build the app before their settings are available to it.)
+ */
+let client: NeonQueryFunction<false, false> | null = null;
+const connect = () => {
+  if (!client) {
+    const url = process.env.DATABASE_URL;
+    if (!url) throw new Error('DATABASE_URL is not set. Add it to the server settings (or .env.local).');
+    client = neon(url);
+  }
+  return client;
+};
+export const sql = new Proxy({} as NeonQueryFunction<false, false>, {
+  get: (_target, prop) => {
+    const c = connect();
+    const value = Reflect.get(c, prop);
+    return typeof value === 'function' ? value.bind(c) : value;
+  },
+});
 
 /**
  * Every table keeps the full record in `data`, plus a few readable columns
