@@ -69,7 +69,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
           <Logo />
 
           {/* Search */}
-          <div className="relative flex-1 max-w-lg hidden md:block">
+          <div className="relative flex-1 max-w-lg hidden xl:block">
             <Search className="w-5 h-5 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="search"
@@ -132,7 +132,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
                 aria-label={`Problems to fix: ${openExceptionsCount}`}
               >
                 <AlertTriangle className="w-5 h-5" />
-                <span className="hidden lg:inline">Problems</span>
+                <span className="hidden md:inline">Problems</span>
                 <span
                   className={`min-w-[28px] h-7 px-1.5 rounded-full flex items-center justify-center text-sm ${
                     openExceptionsCount > 0 ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-700'
@@ -172,7 +172,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={currentUser.avatar} alt="" className="w-10 h-10 rounded-lg object-cover" />
-                <div className="text-left hidden lg:block leading-tight">
+                <div className="text-left hidden xl:block leading-tight">
                   <div className="text-base font-bold text-slate-900">{currentUser.name}</div>
                   <div className="text-sm text-slate-600">{ROLE_LABEL[currentUser.role]}</div>
                 </div>
