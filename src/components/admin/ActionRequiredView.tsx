@@ -54,7 +54,7 @@ export const ActionRequiredView: React.FC<{
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Problems to Fix</h1>
           <p className="text-sm text-slate-500 mt-0.5">
@@ -63,7 +63,7 @@ export const ActionRequiredView: React.FC<{
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full xl:w-auto">
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
@@ -93,7 +93,7 @@ export const ActionRequiredView: React.FC<{
       </div>
 
       {/* Exception Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-4">
         {filteredExceptions.length > 0 ? (
           filteredExceptions.map((exc) => {
             return (
@@ -107,8 +107,8 @@ export const ActionRequiredView: React.FC<{
                     : 'bg-white border-amber-200 hover:border-amber-300'
                 }`}
               >
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-wrap justify-between items-start gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span
                       className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                         exc.priority === 'High' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
@@ -134,7 +134,7 @@ export const ActionRequiredView: React.FC<{
                   <p className="text-xs text-slate-600 mt-1 leading-relaxed">{exc.description}</p>
                 </div>
 
-                <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500">
+                <div className="pt-2 border-t border-slate-100 flex flex-wrap justify-between items-center gap-x-4 gap-y-1 text-sm text-slate-600">
                   <div>
                     {exc.consumerNumber &&
                       (onSelectConsumerNumber ? (
@@ -165,7 +165,7 @@ export const ActionRequiredView: React.FC<{
                 )}
 
                 {exc.status === 'Open' && (
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex flex-col min-[420px]:flex-row gap-2 pt-2">
                     <button
                       onClick={() => {
                         setSelectedException(exc);
@@ -192,7 +192,7 @@ export const ActionRequiredView: React.FC<{
             );
           })
         ) : (
-          <div className="col-span-2 py-12 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
+          <div className="md:col-span-2 lg:col-span-1 xl:col-span-2 py-12 text-center text-base text-slate-600 bg-white rounded-2xl border border-slate-200">
             {filterStatus === 'Open' && filterType === 'All' ? 'Nothing to fix right now. 🎉' : 'Nothing matches these filters.'}
           </div>
         )}
@@ -200,7 +200,7 @@ export const ActionRequiredView: React.FC<{
 
       {/* Resolution Modal */}
       {selectedException && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200">
             <h3 className="text-base font-bold text-slate-900">
               {mode === 'resolve' ? 'Mark as fixed' : 'Not a problem'}: {selectedException.title}

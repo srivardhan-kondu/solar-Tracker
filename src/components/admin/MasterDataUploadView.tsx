@@ -202,11 +202,11 @@ export const MasterDataUploadView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Master Data Upload Hub</h1>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Upload Excel Lists</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Bulk ingest Consumer records, Solar Panel Barcodes, and Inverter Serial Numbers.
+            Add consumers, panels and inverters from an Excel file. Choose the type of list first.
           </p>
         </div>
 
@@ -222,11 +222,11 @@ export const MasterDataUploadView: React.FC = () => {
       </div>
 
       {/* Dataset Selection Tabs */}
-      <div className="flex gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3" role="group" aria-label="Type of list">
         {[
-          { key: 'consumer', label: '1. Consumer Master', desc: 'Beneficiary details, village & ULA' },
-          { key: 'panels', label: '2. Panel Inventory', desc: 'Solar PV panel barcodes' },
-          { key: 'inverters', label: '3. Inverter Inventory', desc: 'Inverter serials & warehouse stock' },
+          { key: 'consumer', label: 'Consumer list', desc: 'Names, villages, mobile and ULA numbers' },
+          { key: 'panels', label: 'Panel list', desc: 'Serial numbers of solar panels in stock' },
+          { key: 'inverters', label: 'Inverter list', desc: 'Serial numbers of inverters in stock' },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -244,8 +244,8 @@ export const MasterDataUploadView: React.FC = () => {
                 : 'bg-white border-slate-200 hover:border-slate-300'
             }`}
           >
-            <div className="text-xs font-bold text-slate-900">{tab.label}</div>
-            <div className="text-xs text-slate-500 mt-0.5">{tab.desc}</div>
+            <div className="text-base font-bold text-slate-900">{tab.label}</div>
+            <div className="text-sm text-slate-600 mt-0.5">{tab.desc}</div>
           </button>
         ))}
       </div>
@@ -282,7 +282,7 @@ export const MasterDataUploadView: React.FC = () => {
         {/* Column Auto-Detection & Preview (FR-MD-007) */}
         {previewRows.length > 0 && (
           <div className="space-y-4 pt-4 border-t border-slate-200">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">Detected Columns & Sample Preview</h3>
                 <p className="text-xs text-slate-500">

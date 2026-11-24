@@ -118,7 +118,7 @@ export const DashboardView: React.FC<{
   return (
     <div className="space-y-6">
       {/* Top Banner & Division Filter */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Dashboard</h1>
           <p className="text-sm text-slate-500 mt-0.5">How the work is going today. Click any box to see the list.</p>

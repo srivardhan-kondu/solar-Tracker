@@ -18,7 +18,7 @@ export const AuditLogView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <History className="w-7 h-7 text-brand-600" />

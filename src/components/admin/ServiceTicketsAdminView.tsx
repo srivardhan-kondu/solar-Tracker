@@ -81,7 +81,7 @@ export const ServiceTicketsAdminView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">
             {isEngineer ? 'My Service Jobs' : 'Service Complaints'}
@@ -111,7 +111,7 @@ export const ServiceTicketsAdminView: React.FC = () => {
       </div>
 
       {/* Ticket List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-4">
         {visibleTickets.length === 0 && (
           <div className="md:col-span-2 py-12 text-center text-sm text-slate-500 bg-white rounded-2xl border border-slate-200">
             {isEngineer ? 'No open jobs assigned to you.' : 'No open complaints.'}
@@ -122,8 +122,8 @@ export const ServiceTicketsAdminView: React.FC = () => {
             key={t.id}
             className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3"
           >
-            <div className="flex justify-between items-start">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-wrap justify-between items-start gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono font-bold text-xs bg-slate-100 text-slate-800 px-2 py-0.5 rounded">
                   {t.ticketNumber}
                 </span>
@@ -153,20 +153,24 @@ export const ServiceTicketsAdminView: React.FC = () => {
               <p className="text-xs text-slate-600 mt-1">{t.description}</p>
             </div>
 
-            <div className="p-2.5 bg-slate-50 rounded-xl text-xs space-y-1 text-slate-600">
-              <div className="flex justify-between">
-                <span>Consumer:</span>
-                <span className="font-bold text-slate-900">{t.consumerName} ({t.consumerNumber})</span>
+            <dl className="p-3 bg-slate-50 rounded-xl text-sm space-y-1.5 text-slate-600">
+              <div>
+                <dt className="inline">Consumer: </dt>
+                <dd className="inline font-bold text-slate-900">
+                  {t.consumerName} (<span className="font-mono">{t.consumerNumber}</span>)
+                </dd>
               </div>
-              <div className="flex justify-between">
-                <span>Village:</span>
-                <span>{t.village}, {t.division}</span>
+              <div>
+                <dt className="inline">Village: </dt>
+                <dd className="inline text-slate-900">
+                  {t.village}, {t.division}
+                </dd>
               </div>
-              <div className="flex justify-between">
-                <span>Engineer:</span>
-                <span className="font-semibold text-slate-800">{t.assignedEngineerName || 'Unassigned'}</span>
+              <div>
+                <dt className="inline">Engineer: </dt>
+                <dd className="inline font-semibold text-slate-900">{t.assignedEngineerName || 'Not chosen yet'}</dd>
               </div>
-            </div>
+            </dl>
 
             {t.visitNotes && (
               <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900">
@@ -188,7 +192,7 @@ export const ServiceTicketsAdminView: React.FC = () => {
 
       {/* CREATE TICKET MODAL */}
       {createModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200">
             <h3 className="text-base font-bold text-slate-900">New complaint</h3>
 
@@ -290,7 +294,7 @@ export const ServiceTicketsAdminView: React.FC = () => {
 
       {/* RESOLVE TICKET MODAL */}
       {selectedTicket && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200">
             <h3 className="text-base font-bold text-slate-900">Close Ticket: {selectedTicket.ticketNumber}</h3>
 

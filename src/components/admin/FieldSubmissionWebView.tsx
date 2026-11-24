@@ -269,7 +269,7 @@ export const FieldSubmissionWebView: React.FC<{
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">New Installation</h1>
           <p className="text-sm text-slate-500 mt-0.5">
@@ -278,12 +278,12 @@ export const FieldSubmissionWebView: React.FC<{
         </div>
 
         {/* Consumer Picker */}
-        <label className="flex flex-col sm:flex-row sm:items-center gap-2 w-full lg:w-auto">
+        <label className="flex flex-col sm:flex-row sm:items-center gap-2 w-full xl:w-auto">
           <span className="text-sm font-semibold text-slate-700">Consumer:</span>
           <select
             value={activeConsumerNum}
             onChange={(e) => handlePickConsumer(e.target.value)}
-            className="text-sm bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-slate-800 lg:min-w-[320px]"
+            className="text-sm bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-slate-800 w-full sm:w-auto sm:min-w-[320px]"
           >
             <option value="">— Choose a consumer —</option>
             {/* Keep the draft's consumer listed even if it is no longer "open" */}
@@ -379,7 +379,7 @@ export const FieldSubmissionWebView: React.FC<{
             </div>
           )}
 
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-6">
             {/* STEP 1 */}
             {activeStep === 1 && (
               <div className="space-y-4">
@@ -456,14 +456,14 @@ export const FieldSubmissionWebView: React.FC<{
             {/* STEP 3 */}
             {activeStep === 3 && (
               <div className="space-y-4">
-                <div className="flex justify-between items-center gap-3">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-3">
                   <div>
                     <h3 className="text-lg font-bold text-slate-900">Step 3 — Scan the 4 panels</h3>
                     <p className="text-sm text-slate-500">
                       Type the number from each panel&apos;s label, or tap the stock number below it.
                     </p>
                   </div>
-                  <span className="text-sm font-bold bg-brand-50 text-brand-700 px-3 py-1 rounded-full whitespace-nowrap">
+                  <span className="self-start sm:self-auto text-sm font-bold bg-brand-50 text-brand-700 px-3 py-1 rounded-full whitespace-nowrap">
                     {panelsDone(installerDraft)} of 4 done
                   </span>
                 </div>
@@ -587,12 +587,12 @@ export const FieldSubmissionWebView: React.FC<{
             {/* STEP 5 */}
             {activeStep === 5 && (
               <div className="space-y-4">
-                <div className="flex justify-between items-center gap-3">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-3">
                   <div>
                     <h3 className="text-lg font-bold text-slate-900">Step 5 — Take 7 photos</h3>
                     <p className="text-sm text-slate-500">Take each photo as shown. All 7 are needed for the subsidy.</p>
                   </div>
-                  <span className="text-sm font-bold bg-brand-50 text-brand-700 px-3 py-1 rounded-full whitespace-nowrap">
+                  <span className="self-start sm:self-auto text-sm font-bold bg-brand-50 text-brand-700 px-3 py-1 rounded-full whitespace-nowrap">
                     {photosDone(installerDraft)} of 7 done
                   </span>
                 </div>
