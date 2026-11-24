@@ -27,6 +27,7 @@ export const DCRModuleView: React.FC = () => {
   } | null>(null);
   const [filterStatus, setFilterStatus] = useState('All');
   const [searchUla, setSearchUla] = useState('');
+  const [parseError, setParseError] = useState<string | null>(null);
 
   // Sample DCR template download (FR-DCR-001)
   const handleDownloadDcrTemplate = () => {
@@ -48,6 +49,8 @@ export const DCRModuleView: React.FC = () => {
 
     setDcrFile(file);
     setReconcileResult(null);
+    setParseError(null);
+    setDcrRows([]);
 
     const reader = new FileReader();
     reader.onload = (evt) => {
@@ -57,17 +60,28 @@ export const DCRModuleView: React.FC = () => {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const data: any[] = XLSX.utils.sheet_to_json(ws);
 
-        const parsed = data.map((row) => ({
-          ula: String(row.ULA || row.ula || row['ULA Identifier'] || ''),
-          dcrNumber: String(row.DCR_NUMBER || row.dcrNumber || row['DCR Number'] || ''),
-        }));
+        const parsed = data
+          .map((row) => ({
+            ula: String(row.ULA || row.ula || row['ULA Identifier'] || '').trim(),
+            dcrNumber: String(row.DCR_NUMBER || row.dcrNumber || row['DCR Number'] || '').trim(),
+          }))
+          .filter((r) => r.ula || r.dcrNumber);
 
-        setDcrRows(parsed);
+        if (parsed.length === 0) {
+          setParseError('No ULA and DCR numbers were found. The file needs two columns named "ULA" and "DCR_NUMBER".');
+        } else if (parsed.some((r) => !r.ula || !r.dcrNumber)) {
+          setParseError(
+            `${parsed.filter((r) => !r.ula || !r.dcrNumber).length} rows are missing a ULA or a DCR number. Please fill them in and upload again.`
+          );
+        } else {
+          setDcrRows(parsed);
+        }
       } catch {
-        alert('Could not parse DCR Excel file.');
+        setParseError('This file could not be read. Please save it as Excel (.xlsx) or CSV and try again.');
       }
     };
     reader.readAsBinaryString(file);
+    e.target.value = '';
   };
 
   const handleExecuteReconciliation = () => {
@@ -93,9 +107,10 @@ export const DCRModuleView: React.FC = () => {
       {/* Header */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">DCR Reconciliation Engine</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Automated ULA-to-Consumer matching, MNRE DCR mapping, and conflict exception management.
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">DCR Numbers</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Upload the DCR list you receive. Each row is matched to a consumer using the ULA number, and the DCR number
+            is saved on that consumer automatically.
           </p>
         </div>
 
@@ -115,7 +130,7 @@ export const DCRModuleView: React.FC = () => {
           <div className="text-sm font-bold text-slate-800">
             {dcrFile ? dcrFile.name : 'Upload Discom / MNRE DCR Excel Spreadsheet'}
           </div>
-          <p className="text-xs text-slate-400 mt-1">Requires ULA and DCR_NUMBER columns</p>
+          <p className="text-sm text-slate-500 mt-1">The file needs two columns: ULA and DCR_NUMBER. Download the template to see the format.</p>
 
           <label className="mt-3 inline-block px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold cursor-pointer shadow-sm transition-colors">
             <span>Select DCR File</span>
@@ -123,13 +138,20 @@ export const DCRModuleView: React.FC = () => {
           </label>
         </div>
 
+        {parseError && (
+          <div role="alert" className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-900 flex items-start gap-2">
+            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
+            <span>{parseError}</span>
+          </div>
+        )}
+
         {/* Preview and Execution */}
         {dcrRows.length > 0 && (
           <div className="p-4 bg-brand-50/60 border border-brand-200 rounded-xl space-y-3">
             <div className="flex justify-between items-center">
               <div>
                 <div className="text-xs font-bold text-slate-900">
-                  Ready to Reconcile ({dcrRows.length} Rows Detected)
+                  {dcrRows.length} rows ready to match
                 </div>
                 <div className="text-[11px] text-slate-500">
                   System will cross-reference ULA against consumer master database.
@@ -139,7 +161,7 @@ export const DCRModuleView: React.FC = () => {
                 onClick={handleExecuteReconciliation}
                 className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-colors"
               >
-                <span>Run Automated Match</span>
+                <span>Match now</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -147,19 +169,49 @@ export const DCRModuleView: React.FC = () => {
         )}
 
         {/* Results Banner */}
-        {reconcileResult && (
-          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-950 flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <div className="font-bold text-sm">Reconciliation Finished</div>
-              <div className="mt-1 flex gap-4 text-xs">
-                <span className="font-bold text-emerald-700">✓ {reconcileResult.matched} Successfully Matched</span>
-                <span className="font-bold text-amber-700">⚠ {reconcileResult.unmatched} ULA Not Found</span>
-                <span className="font-bold text-red-700">✕ {reconcileResult.conflicts} Existing Value Conflicts</span>
+        {reconcileResult &&
+          (() => {
+            const problems = reconcileResult.unmatched + reconcileResult.conflicts;
+            const tone =
+              problems === 0
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                : reconcileResult.matched === 0
+                ? 'bg-red-50 border-red-200 text-red-950'
+                : 'bg-amber-50 border-amber-200 text-amber-950';
+            return (
+              <div className={`p-4 border rounded-xl text-sm flex items-start gap-3 ${tone}`}>
+                {problems === 0 ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                ) : (
+                  <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                )}
+                <div className="space-y-1">
+                  <div className="font-bold">
+                    {problems === 0 ? 'All rows matched' : `${problems} rows need attention`}
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    <span className="font-semibold text-emerald-700">✓ {reconcileResult.matched} matched and saved</span>
+                    {reconcileResult.unmatched > 0 && (
+                      <span className="font-semibold text-amber-800">
+                        ⚠ {reconcileResult.unmatched} ULA numbers not found in the consumer list
+                      </span>
+                    )}
+                    {reconcileResult.conflicts > 0 && (
+                      <span className="font-semibold text-red-700">
+                        ✕ {reconcileResult.conflicts} consumers already have a different DCR number
+                      </span>
+                    )}
+                  </div>
+                  {problems > 0 && (
+                    <p>
+                      They are listed in the table below.
+                      {reconcileResult.unmatched > 0 && ' Rows whose ULA was not found were also added to "Problems to Fix".'}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            );
+          })()}
       </div>
 
       {/* Reconciled Records Table */}
@@ -183,10 +235,10 @@ export const DCRModuleView: React.FC = () => {
               onChange={(e) => setFilterStatus(e.target.value)}
               className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-semibold text-slate-700"
             >
-              <option value="All">All Results</option>
+              <option value="All">All rows</option>
               <option value="Matched">Matched</option>
-              <option value="ULA Not Found">ULA Not Found</option>
-              <option value="Existing Value Conflict">Existing Value Conflict</option>
+              <option value="ULA Not Found">ULA not found</option>
+              <option value="Existing Value Conflict">Different DCR already saved</option>
             </select>
           </div>
         </div>
