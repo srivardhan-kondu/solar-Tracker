@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLang } from '@/i18n/LanguageContext';
 import {
   CheckCircle2,
@@ -11,6 +11,7 @@ import {
   ArrowRight,
   ShieldAlert,
   Save,
+  Loader2,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { Installation, PhotoCategory, PhotoEvidence, GpsLocation } from '@/types';
@@ -22,6 +23,8 @@ import {
   photosDone,
   REQUIRED_PHOTOS,
 } from '@/lib/installationSteps';
+import { CameraCapture, CapturedPhoto } from '@/components/camera/CameraCapture';
+import { distanceMetres, formatGeo, hasGeo, mapsLink } from '@/lib/geoPhoto';
 import { canInstall, needsSurvey } from '@/lib/survey';
 
 const PHOTO_GUIDES: Record<PhotoCategory, { title: string; hint: string; sampleUrl: string }> = {
@@ -91,8 +94,6 @@ export const FieldSubmissionWebView: React.FC<{
     scanPanel,
     scanInverter,
     addPhotoToDraft,
-    removePhotoFromDraft,
-    setGpsToDraft,
     submitInstallationDraft,
     activeStep,
     setDraftStep,
@@ -158,28 +159,100 @@ export const FieldSubmissionWebView: React.FC<{
     if (res.success) setInverterInput('');
   };
 
-  const handleSimulateGps = () => {
-    const loc: GpsLocation = {
-      latitude: 16.3218 + (Math.random() - 0.5) * 0.005,
-      longitude: 80.4429 + (Math.random() - 0.5) * 0.005,
-      accuracy: 3.8,
-      capturedAt: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      address: `${currentConsumer?.village || 'Guntur'}, Andhra Pradesh`,
-    };
-    setGpsToDraft(loc);
+  // ---------- Step 6: the phone's real location ----------
+  // Keep reading GPS for a short while and keep the most accurate reading.
+  const GPS_GOOD_ENOUGH_M = 10;
+  const GPS_MAX_WAIT_MS = 20000;
+  type Fix = { latitude: number; longitude: number; accuracy: number };
+  const [gpsFinding, setGpsFinding] = useState(false);
+  const [gpsBest, setGpsBest] = useState<Fix | null>(null);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const gpsWatch = useRef<number | null>(null);
+  const gpsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gpsBestRef = useRef<Fix | null>(null);
+
+  const stopGps = () => {
+    if (gpsWatch.current !== null) navigator.geolocation.clearWatch(gpsWatch.current);
+    if (gpsTimer.current) clearTimeout(gpsTimer.current);
+    gpsWatch.current = null;
+    gpsTimer.current = null;
+    setGpsFinding(false);
   };
 
-  const handleAttachPhoto = (category: PhotoCategory) => {
-    const guide = PHOTO_GUIDES[category];
+  const saveGps = () => {
+    const best = gpsBestRef.current;
+    stopGps();
+    if (!best) {
+      setGpsError(t('Could not find your location. Turn on location (GPS) on the phone, stand outside near the panels, and try again.'));
+      return;
+    }
+    const gps: GpsLocation = {
+      latitude: best.latitude,
+      longitude: best.longitude,
+      accuracy: Math.round(best.accuracy * 10) / 10,
+      capturedAt: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+      isSimulated: false,
+    };
+    updateDraft({ gps });
+  };
+
+  const handleCaptureGps = () => {
+    setGpsError(null);
+    if (!window.isSecureContext || !navigator.geolocation) {
+      setGpsError(t('This device or link cannot read the location. Open the app with its https link in Chrome.'));
+      return;
+    }
+    stopGps();
+    gpsBestRef.current = null;
+    setGpsBest(null);
+    setGpsFinding(true);
+    gpsWatch.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const fix = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy };
+        if (!gpsBestRef.current || fix.accuracy < gpsBestRef.current.accuracy) {
+          gpsBestRef.current = fix;
+          setGpsBest(fix);
+        }
+        if (fix.accuracy <= GPS_GOOD_ENOUGH_M) saveGps();
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          stopGps();
+          setGpsError(t('Location permission is off. Allow location for this app in your browser settings, then try again.'));
+        }
+        // Other errors: keep trying until the time runs out
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: GPS_MAX_WAIT_MS }
+    );
+    gpsTimer.current = setTimeout(saveGps, GPS_MAX_WAIT_MS);
+  };
+
+  // Stop reading GPS when leaving the step, switching consumer, or closing the screen
+  useEffect(() => {
+    if (gpsWatch.current !== null) stopGps();
+    setGpsError(null);
+    setGpsBest(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeStep, installerDraft?.consumerNumber]);
+  useEffect(() => () => {
+    if (gpsWatch.current !== null) navigator.geolocation.clearWatch(gpsWatch.current);
+    if (gpsTimer.current) clearTimeout(gpsTimer.current);
+  }, []);
+
+  // Photos come only from the in-app camera, with the location printed on them
+  const [cameraFor, setCameraFor] = useState<PhotoCategory | null>(null);
+  const handlePhotoTaken = (category: PhotoCategory, shot: CapturedPhoto) => {
     const photo: PhotoEvidence = {
       id: `photo_${Date.now()}_${category}`,
       category,
-      name: guide.title,
-      url: guide.sampleUrl,
-      capturedAt: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      status: 'uploaded',
+      name: PHOTO_GUIDES[category].title,
+      url: shot.url,
+      capturedAt: shot.capturedAt,
+      status: 'captured',
+      geo: shot.geo,
     };
     addPhotoToDraft(category, photo);
+    setCameraFor(null);
   };
 
   const handleSubmitFinal = () => {
@@ -600,11 +673,12 @@ export const FieldSubmissionWebView: React.FC<{
                   {REQUIRED_PHOTOS.map((cat) => {
                     const guide = PHOTO_GUIDES[cat];
                     const photo = installerDraft.photos?.[cat];
+                    const ok = hasGeo(photo);
                     return (
                       <div
                         key={cat}
                         className={`rounded-xl border overflow-hidden ${
-                          photo ? 'bg-emerald-50/40 border-emerald-300' : 'bg-slate-50 border-slate-200'
+                          !photo ? 'bg-slate-50 border-slate-200' : ok ? 'bg-emerald-50/40 border-emerald-300' : 'bg-red-50/40 border-red-300'
                         }`}
                       >
                         <div className="h-36 bg-slate-100 relative overflow-hidden flex items-center justify-center">
@@ -612,34 +686,53 @@ export const FieldSubmissionWebView: React.FC<{
                             <>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img src={photo.url} alt={t(guide.title)} className="w-full h-full object-cover" />
-                              <span className="absolute bottom-2 right-2 bg-emerald-600 text-white text-xs font-bold px-2 py-0.5 rounded">{t("✓ Done")}</span>
+                              <span className={`absolute bottom-2 right-2 text-white text-xs font-bold px-2 py-0.5 rounded ${ok ? 'bg-emerald-600' : 'bg-red-600'}`}>
+                                {ok ? t("✓ Done") : t("No location")}
+                              </span>
                             </>
                           ) : (
-                            <div className="text-center p-3 text-slate-400">
-                              <Camera className="w-8 h-8 mx-auto mb-1 opacity-50" />
-                              <span className="text-sm font-semibold">{t("Photo needed")}</span>
-                            </div>
+                            <>
+                              {/* A guide picture showing what to take. It is never used as the photo. */}
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={guide.sampleUrl} alt="" className="w-full h-full object-cover opacity-40 grayscale" />
+                              <span className="absolute top-2 left-2 bg-white/90 text-slate-700 text-xs font-bold px-2 py-0.5 rounded">{t("Example")}</span>
+                              <span className="absolute inset-0 flex flex-col items-center justify-center text-slate-700">
+                                <Camera className="w-8 h-8 mb-1" />
+                                <span className="text-sm font-bold bg-white/80 px-2 rounded">{t("Photo needed")}</span>
+                              </span>
+                            </>
                           )}
                         </div>
                         <div className="p-3 space-y-2">
                           <div className="text-sm font-bold text-slate-900">{t(guide.title)}</div>
                           <p className="text-sm text-slate-500">{t(guide.hint)}</p>
-                          {photo ? (
-                            <button
-                              onClick={() => removePhotoFromDraft(cat)}
-                              className="w-full py-2.5 border border-slate-300 hover:bg-slate-100 rounded-lg text-sm font-semibold text-slate-600"
-                            >{t("Take again")}</button>
-                          ) : (
-                            <button
-                              onClick={() => handleAttachPhoto(cat)}
-                              className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-bold shadow-sm"
-                            >{t("Take photo")}</button>
-                          )}
+                          {photo?.geo && <p className="text-xs text-slate-500">📍 {formatGeo(photo.geo)}</p>}
+                          {photo && !ok && <p className="text-sm font-semibold text-red-700">{t("This photo has no location. Please take it again.")}</p>}
+                          <button
+                            onClick={() => setCameraFor(cat)}
+                            className={
+                              photo && ok
+                                ? 'w-full py-2.5 border border-slate-300 hover:bg-slate-100 rounded-lg text-sm font-semibold text-slate-600'
+                                : 'w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-bold shadow-sm flex items-center justify-center gap-2'
+                            }
+                          >
+                            {!(photo && ok) && <Camera className="w-4 h-4" />}
+                            {photo ? t("Take again") : t("Take photo")}
+                          </button>
                         </div>
                       </div>
                     );
                   })}
                 </div>
+
+                {cameraFor && (
+                  <CameraCapture
+                    title={t(PHOTO_GUIDES[cameraFor].title)}
+                    stampLabel={`${installerDraft.consumerNumber} · ${PHOTO_GUIDES[cameraFor].title}`}
+                    onClose={() => setCameraFor(null)}
+                    onCapture={(shot) => handlePhotoTaken(cameraFor, shot)}
+                  />
+                )}
 
                 <StepFooter step={5} nextLabel="Next: location" />
               </div>
@@ -652,26 +745,73 @@ export const FieldSubmissionWebView: React.FC<{
                 <p className="text-sm text-slate-500">{t("Stand near the panels, outside if you can, then tap the button.")}</p>
 
                 <div className="max-w-md p-5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-                  {installerDraft.gps ? (
-                    <div className="space-y-3">
-                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-900 flex items-center gap-2">
-                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                        <div>
-                          <div className="font-bold">{t("Location saved")}</div>
-                          <div className="text-emerald-700">
-                            {installerDraft.gps.address} · {t('accurate to {m} m', { m: installerDraft.gps.accuracy })}
-                          </div>
-                        </div>
+                  {gpsFinding ? (
+                    <div className="text-center py-4 space-y-3" role="status">
+                      <Loader2 className="w-10 h-10 text-brand-600 mx-auto animate-spin" />
+                      <div className="text-base font-bold text-slate-900">{t("Finding your location…")}</div>
+                      <div className="text-sm text-slate-600">
+                        {gpsBest
+                          ? t('Best so far: accurate to {m} m. Getting a better reading…', { m: Math.round(gpsBest.accuracy) })
+                          : t("Stay still, outside if you can. This can take up to 20 seconds.")}
                       </div>
-                      <button
-                        onClick={handleSimulateGps}
-                        className="w-full py-2.5 border border-slate-300 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                      >{t("Capture again")}</button>
+                      {gpsBest && (
+                        <button onClick={saveGps} className="w-full py-2.5 border border-slate-300 bg-white rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                          {t("Use this location now")}
+                        </button>
+                      )}
                     </div>
+                  ) : installerDraft.gps ? (
+                    (() => {
+                      const g = installerDraft.gps;
+                      // Compare with where the photos were taken
+                      const photoGeos = Object.values(installerDraft.photos || {}).flatMap((p) => (p?.geo ? [p.geo] : []));
+                      const farthest = photoGeos.length ? Math.max(...photoGeos.map((pg) => distanceMetres(g, pg))) : 0;
+                      return (
+                        <div className="space-y-3">
+                          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-900 flex items-start gap-2">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <div className="font-bold">{t("Location saved")}</div>
+                              <div className="text-emerald-800 font-mono">
+                                {g.latitude.toFixed(6)}, {g.longitude.toFixed(6)}
+                              </div>
+                              <div className="text-emerald-700">
+                                {t('accurate to {m} m', { m: g.accuracy })} · {g.capturedAt}
+                              </div>
+                              <a href={mapsLink(g)} target="_blank" rel="noopener noreferrer" className="text-brand-700 font-semibold underline">
+                                {t("Open in map")}
+                              </a>
+                            </div>
+                          </div>
+                          {g.accuracy > 15 && (
+                            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900 flex items-start gap-2">
+                              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                              {t("The signal is weak, so the office will be asked to check this location. Step outside and capture again if you can.")}
+                            </div>
+                          )}
+                          {farthest > 200 && (
+                            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900 flex items-start gap-2">
+                              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                              {t("This is {d} m from where the photos were taken. Make sure you are at the consumer's home.", { d: Math.round(farthest) })}
+                            </div>
+                          )}
+                          <button
+                            onClick={handleCaptureGps}
+                            className="w-full py-2.5 border border-slate-300 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                          >{t("Capture again")}</button>
+                        </div>
+                      );
+                    })()
                   ) : (
                     <div className="text-center py-6 space-y-3">
                       <MapPin className="w-10 h-10 text-brand-600 mx-auto" />
-                      <button onClick={handleSimulateGps} className={btnPrimary + ' mx-auto'}>{t("Capture location now")}</button>
+                      <button onClick={handleCaptureGps} className={btnPrimary + ' mx-auto'}>{t("Capture location now")}</button>
+                    </div>
+                  )}
+                  {gpsError && !gpsFinding && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm font-semibold text-red-800 flex items-start gap-2" role="alert">
+                      <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      {gpsError}
                     </div>
                   )}
                 </div>

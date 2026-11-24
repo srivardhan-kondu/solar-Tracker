@@ -1,5 +1,6 @@
 import { Installation, PhotoCategory } from '@/types';
 import { noTranslate, Translate } from '@/i18n/LanguageContext';
+import { hasGeo } from '@/lib/geoPhoto';
 
 export const REQUIRED_PHOTOS: PhotoCategory[] = [
   'front',
@@ -22,7 +23,8 @@ export const PHOTO_LABELS: Record<PhotoCategory, string> = {
 };
 
 export const panelsDone = (d: Installation | null) => (d?.panels.filter((p) => p.trim() !== '').length ?? 0);
-export const photosDone = (d: Installation | null) => REQUIRED_PHOTOS.filter((c) => d?.photos?.[c]).length;
+/** Photos taken with a location. A photo without one does not count. */
+export const photosDone = (d: Installation | null) => REQUIRED_PHOTOS.filter((c) => hasGeo(d?.photos?.[c])).length;
 
 /** Whether the work for a step (1–7) is actually finished, based on the data, not the step number. */
 export const isStepDone = (d: Installation | null, step: number): boolean => {
@@ -71,7 +73,7 @@ export const missingItems = (d: Installation | null, t: Translate = noTranslate)
   if (!d.consumerConfirmed) out.push(t('Consumer details not confirmed'));
   if (panelsDone(d) < 4) out.push(t('{n} panel(s) not scanned', { n: 4 - panelsDone(d) }));
   if (!d.inverterSerial.trim()) out.push(t('Inverter not scanned'));
-  const missingPhotos = REQUIRED_PHOTOS.filter((c) => !d.photos?.[c]).map((c) => t(PHOTO_LABELS[c]));
+  const missingPhotos = REQUIRED_PHOTOS.filter((c) => !hasGeo(d.photos?.[c])).map((c) => t(PHOTO_LABELS[c]));
   if (missingPhotos.length) out.push(t('Photos missing: {list}', { list: missingPhotos.join(', ') }));
   if (!d.gps) out.push(t('Location not captured'));
   return out;

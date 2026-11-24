@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   User,
   Consumer,
@@ -15,6 +15,7 @@ import {
   PhotoEvidence,
   GpsLocation,
   SiteSurvey,
+  GeoTag,
 } from '@/types';
 import {
   SEED_USERS,
@@ -29,6 +30,9 @@ import {
 } from '@/data/seedData';
 import { useLang } from '@/i18n/LanguageContext';
 import { canInstall, reopenBlocker, surveyMissing } from '@/lib/survey';
+import { SyncState, uploadPhoto, useServerSync } from '@/lib/serverSync';
+import { hasGeo } from '@/lib/geoPhoto';
+import { AllData, CollectionKey, DbRecord } from '@/lib/tables';
 
 interface AppContextType {
   // State
@@ -50,6 +54,8 @@ interface AppContextType {
   surveys: SiteSurvey[];
   /** True when the browser refused to save (storage full), so recent work may be lost on refresh */
   storageFull: boolean;
+  /** Whether everything has been saved to the server */
+  syncState: SyncState;
 
   // Setters & Actions
   setCurrentUser: (user: User) => void;
@@ -79,7 +85,7 @@ interface AppContextType {
   rejectInstallation: (installationId: string, notes: string) => void;
   recordManualSerial: (serial: string, reason: string) => void;
   logAudit: (action: string, recordType: AuditEvent['recordType'], recordId: string, details: string, oldValue?: string, newValue?: string, reason?: string) => void;
-  resetAllData: () => void;
+  resetAllData: () => Promise<boolean>;
   /** Change a survey that has not been sent yet; starts one if needed. */
   updateSurveyDraft: (consumerNumber: string, change: (s: SiteSurvey) => SiteSurvey) => void;
   submitSurvey: (consumerNumber: string) => { success: boolean; message: string };
@@ -417,7 +423,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const missingPhotos: string[] = [];
     const requiredCats: PhotoCategory[] = ['front', 'side', 'consumer', 'meter', 'inverter', 'structure', 'earthing'];
     requiredCats.forEach((c) => {
-      if (!installerDraft.photos[c]) missingPhotos.push(c);
+      if (!hasGeo(installerDraft.photos[c])) missingPhotos.push(c); // a photo without a location does not count
     });
 
     const isComplete =
@@ -1126,22 +1132,122 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: t('Survey reopened. It is back on the installer\'s Site Survey list.') };
   };
 
-  const resetAllData = () => {
-    setUsers(SEED_USERS);
+  // ---------- Database sync ----------
+  const { syncState, reloadAfterReset } = useServerSync({
+    collections: {
+      users,
+      consumers,
+      inventory,
+      installations,
+      dcrRecords,
+      serviceTickets,
+      exceptions,
+      auditLogs,
+      surveys,
+    } as unknown as AllData,
+    setters: {
+      users: setUsers,
+      consumers: setConsumers,
+      inventory: setInventory,
+      installations: setInstallations,
+      dcrRecords: setDcrRecords,
+      serviceTickets: setServiceTickets,
+      exceptions: setExceptions,
+      auditLogs: setAuditLogs,
+      surveys: setSurveys,
+    } as unknown as Record<CollectionKey, (rows: DbRecord[]) => void>,
+    paused: !isOnline,
+  });
+
+  // Try failed photo uploads again now and then
+  const [photoRetryTick, setPhotoRetryTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setPhotoRetryTick((n) => n + 1), 20000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Photos are first kept on the phone. Send each one to photo storage and keep only its link.
+  const uploading = useRef(new Set<string>());
+  const refused = useRef(new Set<string>()); // the server will never take these; do not keep retrying
+  useEffect(() => {
+    if (!isOnline || syncState === 'loading') return;
+    type Job = { id: string; url: string; folder: 'surveys' | 'installations'; group: string; geo?: GeoTag };
+    const jobs: Job[] = [];
+    for (const s of surveys) {
+      for (const p of [s.billPhoto, s.aadhaarPhoto, ...s.roofPhotos, ...s.surroundingsPhotos]) {
+        if (p) jobs.push({ id: p.id, url: p.url, folder: 'surveys', group: s.consumerNumber, geo: p.geo });
+      }
+    }
+    for (const inst of [...(installerDraft ? [installerDraft] : []), ...installations]) {
+      for (const p of Object.values(inst.photos || {})) {
+        if (p) jobs.push({ id: p.id, url: p.url, folder: 'installations', group: inst.consumerNumber, geo: p.geo });
+      }
+    }
+    for (const job of jobs) {
+      if (!job.url.startsWith('data:') || uploading.current.has(job.id) || refused.current.has(job.id)) continue;
+      // A photo without a full location is never sent; the screens ask for it to be taken again
+      const g = job.geo;
+      if (!g || typeof g.takenAt !== 'number' || typeof g.clockChecked !== 'boolean') continue;
+      uploading.current.add(job.id);
+      void uploadPhoto(job.url, job.group, job.folder, {
+        latitude: g.latitude,
+        longitude: g.longitude,
+        accuracy: g.accuracy,
+        takenAt: g.takenAt,
+        clockChecked: g.clockChecked,
+      }).then((result) => {
+        if (result && 'refused' in result) {
+          console.warn('Photo refused by the server:', result.refused);
+          refused.current.add(job.id);
+        }
+        const link = result && 'url' in result ? result.url : null;
+        if (link) {
+          // Swap the photo for its link wherever it is, if it has not been replaced meanwhile
+          const swap = <P extends { id: string; url: string }>(x: P | undefined): P | undefined =>
+            x && x.id === job.id && x.url === job.url ? { ...x, url: link } : x;
+          const swapAll = <P extends { id: string; url: string }>(list: P[]) => list.map((x) => swap(x)!);
+          const swapInst = (i: Installation): Installation => {
+            const photos = { ...i.photos };
+            for (const k of Object.keys(photos) as PhotoCategory[]) photos[k] = swap(photos[k]);
+            return { ...i, photos };
+          };
+          if (job.folder === 'surveys') {
+            setSurveys((prev) =>
+              prev.map((sv) =>
+                sv.consumerNumber !== job.group
+                  ? sv
+                  : {
+                      ...sv,
+                      billPhoto: swap(sv.billPhoto),
+                      aadhaarPhoto: swap(sv.aadhaarPhoto),
+                      roofPhotos: swapAll(sv.roofPhotos),
+                      surroundingsPhotos: swapAll(sv.surroundingsPhotos),
+                    }
+              )
+            );
+          } else {
+            setInstallerDraft((prev) => (prev && prev.consumerNumber === job.group ? swapInst(prev) : prev));
+            setInstallations((prev) => prev.map((i) => (i.consumerNumber === job.group ? swapInst(i) : i)));
+          }
+        }
+        uploading.current.delete(job.id); // if it failed, the next change or retry tries again
+      });
+    }
+  }, [surveys, installations, installerDraft, isOnline, syncState, photoRetryTick]);
+
+  /** "Reset demo": put the sample data back in the database, then reload it */
+  const resetAllData = async (): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/reset', { method: 'POST' });
+      if (!res.ok) return false;
+    } catch {
+      return false;
+    }
     setCurrentUser(SEED_USERS[0]);
-    setConsumers(SEED_CONSUMERS);
-    setInventory(SEED_INVENTORY);
-    setInstallations(SEED_INSTALLATIONS);
-    setDcrRecords(SEED_DCR_RECORDS);
-    setServiceTickets(SEED_SERVICE_TICKETS);
-    setExceptions(SEED_EXCEPTIONS);
-    setAuditLogs(SEED_AUDIT_LOGS);
     setOfflineQueue([]);
     setInstallerDraft(null);
     setActiveStep(1);
-    setSurveys(SEED_SURVEYS);
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(SURVEY_STORAGE_KEY);
+    return reloadAfterReset();
   };
 
   return (
@@ -1164,6 +1270,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         selectedConsumerFor360,
         surveys,
         storageFull: mainStorageFull || surveyStorageFull,
+        syncState,
         setCurrentUser,
         setAppMode,
         setIsOnline,

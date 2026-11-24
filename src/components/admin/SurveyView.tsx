@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -8,14 +8,12 @@ import {
   Camera,
   CheckCircle2,
   ClipboardCheck,
-  ImagePlus,
-  Loader2,
   Send,
   Trash2,
   X,
   XCircle,
 } from 'lucide-react';
-import { useLang } from '@/i18n/LanguageContext';
+import { noTranslate, useLang } from '@/i18n/LanguageContext';
 import { useApp } from '@/context/AppContext';
 import { isOfficeRole } from '@/lib/access';
 import { Consumer, SiteSurvey, SurveyPhoto } from '@/types';
@@ -25,10 +23,12 @@ import {
   SHADE_LEVELS,
   SHADE_SOURCES,
   needsSurvey,
-  shrinkPhoto,
   surveyFor,
   surveyMissing,
 } from '@/lib/survey';
+import { CameraCapture } from '@/components/camera/CameraCapture';
+import { PhotoVerification } from '@/components/camera/PhotoVerification';
+import { formatGeo, hasGeo, mapsLink } from '@/lib/geoPhoto';
 import { DecisionBadge, LabelledPhoto, ReopenedNotice, ReopenSurveyControl, SurveySummary } from './SurveySummary';
 
 const btnPrimary =
@@ -38,67 +38,34 @@ const btnBack =
 
 const now = () => new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
 
-/* ---------- Photo picking ---------- */
+/* ---------- Photo taking ---------- */
 
-/**
- * Two big buttons: open the camera, or pick a photo already on the phone.
- * The photo is shrunk before saving so the phone does not run out of space.
- */
-const PhotoPicker: React.FC<{ onPicked: (photo: SurveyPhoto) => void; compact?: boolean }> = ({ onPicked, compact }) => {
+/** One big button that opens the in-app camera. Photos cannot be uploaded from the phone. */
+const PhotoPicker: React.FC<{ onPicked: (photo: SurveyPhoto) => void; title: string; stampLabel: string }> = ({
+  onPicked,
+  title,
+  stampLabel,
+}) => {
   const { t } = useLang();
-  const cameraRef = useRef<HTMLInputElement>(null);
-  const galleryRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ''; // allow picking the same file again
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setError(t('That file is not a photo. Please choose a photo.'));
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const url = await shrinkPhoto(file);
-      onPicked({ id: `svp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, url, capturedAt: now() });
-    } catch {
-      setError(t('This photo could not be opened. Please try again or take a new one.'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
+  const [open, setOpen] = useState(false);
   return (
-    <div className="space-y-2">
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFile} />
-      <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
-      {busy ? (
-        <div className="flex items-center justify-center gap-2 py-3 text-base font-semibold text-slate-600" role="status">
-          <Loader2 className="w-5 h-5 animate-spin" />
-          {t('Saving photo…')}
-        </div>
-      ) : (
-        <div className={`grid gap-2 ${compact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
-          <button type="button" onClick={() => cameraRef.current?.click()} className={btnPrimary}>
-            <Camera className="w-5 h-5" />
-            {t('Take photo')}
-          </button>
-          <button type="button" onClick={() => galleryRef.current?.click()} className={btnBack}>
-            <ImagePlus className="w-5 h-5" />
-            {t('Choose from phone')}
-          </button>
-        </div>
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={btnPrimary + ' w-full sm:w-auto'}>
+        <Camera className="w-5 h-5" />
+        {t('Take photo')}
+      </button>
+      {open && (
+        <CameraCapture
+          title={title}
+          stampLabel={stampLabel}
+          onClose={() => setOpen(false)}
+          onCapture={(shot) => {
+            setOpen(false);
+            onPicked({ id: `svp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, ...shot });
+          }}
+        />
       )}
-      {error && (
-        <div className="text-sm text-red-800 bg-red-50 border border-red-200 rounded-xl px-3 py-2 flex items-center gap-2" role="alert">
-          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-          {error}
-        </div>
-      )}
-    </div>
+    </>
   );
 };
 
@@ -111,15 +78,20 @@ const PhotoTile: React.FC<{ photo: SurveyPhoto; label: string; onRemove: () => v
 }) => {
   const { t } = useLang();
   return (
-    <div className="rounded-xl border-2 border-emerald-300 overflow-hidden bg-white">
+    <div className={`rounded-xl border-2 overflow-hidden bg-white ${hasGeo(photo) ? 'border-emerald-300' : 'border-red-300'}`}>
       <button type="button" onClick={onOpen} className="block w-full" aria-label={t('View {label}', { label })}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={photo.url} alt={label} className="w-full h-40 object-cover bg-slate-100" />
       </button>
       <div className="p-2.5 flex items-center justify-between gap-2">
-        <span className="text-sm font-bold text-emerald-700 flex items-center gap-1">
-          <CheckCircle2 className="w-4 h-4" />
-          {label}
+        <span className="min-w-0">
+          <span className={`text-sm font-bold flex items-center gap-1 ${hasGeo(photo) ? 'text-emerald-700' : 'text-red-700'}`}>
+            {hasGeo(photo) ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertTriangle className="w-4 h-4 flex-shrink-0" />}
+            {label}
+          </span>
+          <span className={`block text-xs ${hasGeo(photo) ? 'text-slate-500' : 'text-red-700 font-semibold'}`}>
+            {photo.geo ? formatGeo(photo.geo) : hasGeo(photo) ? '' : t('No location — remove and take again')}
+          </span>
         </span>
         <button
           type="button"
@@ -266,6 +238,16 @@ export const SurveyView: React.FC<{ onGoToInstallation: () => void }> = ({ onGoT
         <div>
           <h4 className="text-base font-bold">{t(preview.label, { n: preview.n })}</h4>
           <p className="text-sm text-slate-300">{t('Taken at {time}', { time: preview.photo.capturedAt })}</p>
+              {preview.photo.geo ? (
+                <a href={mapsLink(preview.photo.geo)} target="_blank" rel="noopener noreferrer" className="text-sm text-emerald-300 underline">
+                  📍 {formatGeo(preview.photo.geo)} · {t('Open in map')}
+                </a>
+              ) : (
+                <p className="text-sm text-amber-300">{t('No location saved with this photo')}</p>
+              )}
+              <div className="mt-1.5 max-w-xl">
+                <PhotoVerification url={preview.photo.url} geo={preview.photo.geo} />
+              </div>
         </div>
         <button
           onClick={() => setPreview(null)}
@@ -511,7 +493,11 @@ export const SurveyView: React.FC<{ onGoToInstallation: () => void }> = ({ onGoT
                 ? t('Add at least 1 photo (up to {max}).', { max: MAX_EXTRA_PHOTOS })
                 : t('{n} of {max} photos. Add more if it helps.', { n: list.length, max: MAX_EXTRA_PHOTOS })}
             </div>
-            <PhotoPicker onPicked={(photo) => update((d) => ({ ...d, [key]: [...d[key], photo].slice(0, MAX_EXTRA_PHOTOS) }))} />
+            <PhotoPicker
+              title={t(label, { n: list.length + 1 })}
+              stampLabel={`${openNum} · ${noTranslate(label, { n: list.length + 1 })}`}
+              onPicked={(photo) => update((d) => ({ ...d, [key]: [...d[key], photo].slice(0, MAX_EXTRA_PHOTOS) }))}
+            />
           </div>
         ) : (
           <div className="text-sm text-slate-600">{t('{max} photos added. Remove one to add another.', { max: MAX_EXTRA_PHOTOS })}</div>
@@ -533,7 +519,11 @@ export const SurveyView: React.FC<{ onGoToInstallation: () => void }> = ({ onGoT
       </div>
     ) : (
       <div className="max-w-md">
-        <PhotoPicker onPicked={(photo) => update((d) => ({ ...d, [key]: photo }))} />
+        <PhotoPicker
+          title={t(label)}
+          stampLabel={`${openNum} · ${label}`}
+          onPicked={(photo) => update((d) => ({ ...d, [key]: photo }))}
+        />
       </div>
     );
   };

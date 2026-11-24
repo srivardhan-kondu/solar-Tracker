@@ -33,6 +33,18 @@ export type PhotoCategory =
   | 'structure'
   | 'earthing';
 
+/** Where and when a photo was taken. Every photo taken in the app has one. */
+export interface GeoTag {
+  latitude: number;
+  longitude: number;
+  accuracy: number; // metres
+  capturedAt: string;
+  /** When the photo was taken (epoch ms), by the clock checked against the server when possible */
+  takenAt?: number;
+  /** False when the phone was offline and its own clock had to be used */
+  clockChecked?: boolean;
+}
+
 export interface PhotoEvidence {
   id: string;
   category: PhotoCategory;
@@ -42,6 +54,7 @@ export interface PhotoEvidence {
   status: 'captured' | 'pending_upload' | 'uploaded';
   accuracyNote?: string;
   isBlurry?: boolean;
+  geo?: GeoTag;
 }
 
 export interface GpsLocation {
@@ -143,8 +156,9 @@ export type SurveyDecision = 'Feasible' | 'Not Feasible';
 
 export interface SurveyPhoto {
   id: string;
-  url: string; // small JPEG data URL, or a sample image path
+  url: string; // stored photo link, a JPEG data URL until it is uploaded, or a sample image path
   capturedAt: string;
+  geo?: GeoTag;
 }
 
 export interface SiteSurvey {

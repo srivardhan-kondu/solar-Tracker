@@ -25,6 +25,8 @@ import { STATUS_LABEL } from '@/lib/status';
 import { friendly } from '@/lib/activity';
 import { ROLE_LABEL } from '@/lib/access';
 import { surveyFor } from '@/lib/survey';
+import { PhotoVerification } from '@/components/camera/PhotoVerification';
+import { formatGeo, mapsLink } from '@/lib/geoPhoto';
 import { LabelledPhoto, ReopenedNotice, ReopenSurveyControl, SurveySummary } from './SurveySummary';
 
 const PHOTO_TITLE: Record<string, string> = {
@@ -631,6 +633,16 @@ export const Consumer360Modal: React.FC<{
             <div>
               <h4 className="text-sm font-bold">{t(surveyPreview.label, { n: surveyPreview.n })}</h4>
               <p className="text-xs text-slate-300">{t('Taken at {time}', { time: surveyPreview.photo.capturedAt })}</p>
+              {surveyPreview.photo.geo ? (
+                <a href={mapsLink(surveyPreview.photo.geo)} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-300 underline">
+                  📍 {formatGeo(surveyPreview.photo.geo)} · {t('Open in map')}
+                </a>
+              ) : (
+                <p className="text-xs text-amber-300">{t('No location saved with this photo')}</p>
+              )}
+              <div className="mt-1.5 max-w-xl">
+                <PhotoVerification url={surveyPreview.photo.url} geo={surveyPreview.photo.geo} />
+              </div>
             </div>
             <button
               onClick={() => setSurveyPreview(null)}
@@ -658,6 +670,16 @@ export const Consumer360Modal: React.FC<{
             <div>
               <h4 className="text-sm font-bold">{t(PHOTO_TITLE[activePhotoPreview.category])}</h4>
               <p className="text-xs text-slate-300">{t('Taken at {time}', { time: activePhotoPreview.capturedAt })}</p>
+              {activePhotoPreview.geo ? (
+                <a href={mapsLink(activePhotoPreview.geo)} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-300 underline">
+                  📍 {formatGeo(activePhotoPreview.geo)} · {t('Open in map')}
+                </a>
+              ) : (
+                <p className="text-xs text-amber-300">{t('No location saved with this photo')}</p>
+              )}
+              <div className="mt-1.5 max-w-xl">
+                <PhotoVerification url={activePhotoPreview.url} geo={activePhotoPreview.geo} />
+              </div>
             </div>
             <button
               onClick={() => setActivePhotoPreview(null)}

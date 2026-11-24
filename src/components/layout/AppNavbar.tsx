@@ -153,9 +153,13 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
               <button
                 onClick={() => {
                   if (
-                    window.confirm(t('This deletes ALL changes and puts back the demo data. This cannot be undone. Continue?'))
+                    window.confirm(
+                      t('This deletes ALL data in the database, for everyone, and puts back the demo data. This cannot be undone. Continue?')
+                    )
                   ) {
-                    resetAllData();
+                    void resetAllData().then((ok) => {
+                      if (!ok) window.alert(t('Could not reset. The server may be unreachable, or reset is turned off.'));
+                    });
                   }
                 }}
                 className="hidden sm:flex items-center gap-2 px-3 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100"
