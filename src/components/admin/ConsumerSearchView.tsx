@@ -94,7 +94,7 @@ export const ConsumerSearchView: React.FC<{
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Find a Consumer</h1>
           <p className="text-sm text-slate-500 mt-0.5">
@@ -112,7 +112,7 @@ export const ConsumerSearchView: React.FC<{
       </div>
 
       {/* Search and Filters Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center gap-3">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row items-stretch xl:items-center gap-3">
         <div className="relative flex-1 w-full">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
@@ -125,7 +125,7 @@ export const ConsumerSearchView: React.FC<{
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full xl:w-auto xl:flex xl:items-center">
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -167,7 +167,61 @@ export const ConsumerSearchView: React.FC<{
 
       {/* Records Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        {filteredConsumers.length === 0 && (
+          <div className="xl:hidden p-8 text-center text-base text-slate-600">
+            No consumers match.{' '}
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setStatusFilter('All');
+                setDivisionFilter('All');
+              }}
+              className="font-bold text-brand-700 underline"
+            >
+              Clear search and filters
+            </button>
+          </div>
+        )}
+        {/* Phones, tablets and small laptops: one easy card per consumer */}
+        <ul className="xl:hidden divide-y divide-slate-100">
+          {filteredConsumers.map((c) => {
+            const inst = installationByConsumer.get(c.consumerNumber);
+            return (
+              <li key={c.id} className="p-4 sm:p-5 space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-lg font-bold text-slate-900">{c.name}</div>
+                    <div className="font-mono text-sm text-slate-700">{c.consumerNumber}</div>
+                  </div>
+                  <span className={`px-3 py-1 rounded-full font-bold text-sm ${statusBadgeClass(c.status)}`}>
+                    {STATUS_LABEL[c.status]}
+                  </span>
+                </div>
+                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                  <div><dt className="inline text-slate-500">Village: </dt><dd className="inline text-slate-900">{c.village}, {c.division}</dd></div>
+                  <div><dt className="inline text-slate-500">Installer: </dt><dd className="inline text-slate-900">{c.assignedInstallerName || 'Not assigned'}</dd></div>
+                  <div><dt className="inline text-slate-500">Mobile: </dt><dd className="inline text-slate-900">{c.mobile}</dd></div>
+                  <div className="break-all"><dt className="inline text-slate-500">ULA: </dt><dd className="inline font-mono text-slate-900">{c.ula}</dd></div>
+                  <div className="sm:col-span-2 break-all">
+                    <dt className="inline text-slate-500">DCR: </dt>
+                    <dd className={`inline ${inst?.dcrNumber ? 'font-mono font-bold text-emerald-700' : 'text-slate-600'}`}>
+                      {inst?.dcrNumber || 'Not received'}
+                    </dd>
+                  </div>
+                </dl>
+                <button
+                  onClick={() => onSelectConsumer(c)}
+                  className="w-full sm:w-auto px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-base inline-flex items-center justify-center gap-2"
+                >
+                  <Eye className="w-5 h-5" />
+                  Open details
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="hidden xl:block relative overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
               <tr>

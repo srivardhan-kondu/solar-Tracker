@@ -13,6 +13,13 @@ import {
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
+const statusClass = (status: string) =>
+  status === 'Installed'
+    ? 'bg-emerald-100 text-emerald-800'
+    : status === 'Available'
+    ? 'bg-blue-100 text-blue-800'
+    : 'bg-red-100 text-red-800';
+
 export const InventoryView: React.FC = () => {
   const { inventory } = useApp();
 
@@ -55,7 +62,7 @@ export const InventoryView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Panels & Inverters Stock</h1>
           <p className="text-sm text-slate-500 mt-0.5">
@@ -80,7 +87,7 @@ export const InventoryView: React.FC = () => {
         </p>
 
         <form
-          className="flex gap-2 max-w-lg"
+          className="flex flex-col sm:flex-row gap-2 max-w-lg"
           onSubmit={(e) => {
             e.preventDefault();
             handleLookup();
@@ -125,21 +132,20 @@ export const InventoryView: React.FC = () => {
 
       {/* Equipment Table & Filters */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          {/* Equipment Type switcher */}
-          <div className="flex gap-2">
+        <div className="p-4 border-b border-slate-200 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-3">
+          {/* Equipment type switcher */}
+          <div className="grid grid-cols-3 gap-2" role="group" aria-label="Equipment type">
             {[
-              { key: 'all', label: 'All Equipment' },
-              { key: 'panel', label: 'Solar Panels' },
+              { key: 'all', label: 'All' },
+              { key: 'panel', label: 'Panels' },
               { key: 'inverter', label: 'Inverters' },
             ].map((t) => (
               <button
                 key={t.key}
                 onClick={() => setActiveType(t.key as any)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                  activeType === t.key
-                    ? 'bg-brand-600 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                aria-pressed={activeType === t.key}
+                className={`px-4 py-2 rounded-xl text-base font-bold transition-colors ${
+                  activeType === t.key ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
                 {t.label}
@@ -147,20 +153,22 @@ export const InventoryView: React.FC = () => {
             ))}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <input
-              type="text"
+              type="search"
               value={searchSerial}
               onChange={(e) => setSearchSerial(e.target.value)}
-              placeholder="Search serial or consumer..."
-              className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              placeholder="Search serial, brand or consumer"
+              aria-label="Search stock"
+              className="text-base bg-slate-50 border-2 border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-brand-600"
             />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-semibold text-slate-700"
+              aria-label="Filter by status"
+              className="text-base bg-slate-50 border-2 border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-700"
             >
-              <option value="All">All Statuses</option>
+              <option value="All">All statuses</option>
               <option value="Available">Available</option>
               <option value="Installed">Installed</option>
               <option value="Reserved">Reserved</option>
@@ -171,62 +179,78 @@ export const InventoryView: React.FC = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
-              <tr>
-                <th className="py-3 px-4">Serial Number</th>
-                <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4">Make & model</th>
-                <th className="py-3 px-4">Batch</th>
-                <th className="py-3 px-4">Fitted at</th>
-                <th className="py-3 px-4 text-right">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
-              {filteredInventory.length === 0 && (
+        {filteredInventory.length === 0 && (
+          <div className="p-10 text-center text-base text-slate-600">Nothing matches your search.</div>
+        )}
+
+        {/* Smaller screens: cards */}
+        <ul className="xl:hidden divide-y divide-slate-100">
+          {filteredInventory.map((item) => (
+            <li key={item.id} className="p-4 space-y-1.5">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-mono text-base font-bold text-slate-900 break-all">{item.serialNumber}</div>
+                  <div className="text-sm text-slate-600 capitalize">
+                    {item.type} · {item.brand} {item.model}
+                  </div>
+                </div>
+                <span className={`px-3 py-1 rounded-full font-bold text-sm ${statusClass(item.status)}`}>{item.status}</span>
+              </div>
+              <div className="text-sm">
+                <span className="text-slate-500">Fitted at: </span>
+                {item.linkedConsumerNumber ? (
+                  <span className="font-mono font-bold text-emerald-800">{item.linkedConsumerNumber}</span>
+                ) : (
+                  <span className="text-slate-700">In store</span>
+                )}
+                <span className="text-slate-500"> · Batch </span>
+                <span className="font-mono text-slate-700">{item.batch}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        {/* Wide screens: table */}
+        {filteredInventory.length > 0 && (
+          <div className="hidden xl:block relative overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-sm text-slate-500">
-                    Nothing matches your search.
-                  </td>
+                  <th className="py-3 px-4">Serial number</th>
+                  <th className="py-3 px-4">Make & model</th>
+                  <th className="py-3 px-4">Fitted at</th>
+                  <th className="py-3 px-4 text-right">Status</th>
                 </tr>
-              )}
-              {filteredInventory.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50">
-                  <td className="py-3 px-4 font-mono font-bold text-slate-900">{item.serialNumber}</td>
-                  <td className="py-3 px-4 capitalize font-semibold text-slate-600">{item.type}</td>
-                  <td className="py-3 px-4">
-                    <div className="font-bold text-slate-800">{item.brand}</div>
-                    <div className="text-xs text-slate-400">{item.model}</div>
-                  </td>
-                  <td className="py-3 px-4 font-mono text-xs text-slate-500">{item.batch}</td>
-                  <td className="py-3 px-4">
-                    {item.linkedConsumerNumber ? (
-                      <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                        {item.linkedConsumerNumber}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 italic">In store</span>
-                    )}
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <span
-                      className={`px-2.5 py-1 rounded-full font-bold text-xs ${
-                        item.status === 'Installed'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : item.status === 'Available'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {item.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {filteredInventory.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50">
+                    <td className="py-3 px-4">
+                      <div className="font-mono font-bold text-slate-900">{item.serialNumber}</div>
+                      <div className="text-slate-500 capitalize">
+                        {item.type} · batch <span className="font-mono">{item.batch}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="font-bold text-slate-800">{item.brand}</div>
+                      <div className="text-slate-500">{item.model}</div>
+                    </td>
+                    <td className="py-3 px-4">
+                      {item.linkedConsumerNumber ? (
+                        <span className="font-mono font-bold text-emerald-800">{item.linkedConsumerNumber}</span>
+                      ) : (
+                        <span className="text-slate-600">In store</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <span className={`px-2.5 py-1 rounded-full font-bold text-xs ${statusClass(item.status)}`}>{item.status}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -193,7 +193,7 @@ export const ReportsView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="no-print bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="no-print bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Reports</h1>
           <p className="text-sm text-slate-500 mt-0.5">
@@ -201,7 +201,7 @@ export const ReportsView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-2 gap-2 w-full xl:w-auto xl:flex xl:items-center">
           <button
             onClick={() => window.print()}
             className="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors"
@@ -221,7 +221,7 @@ export const ReportsView: React.FC = () => {
       </div>
 
       {/* Reports Grid Selector */}
-      <div className="no-print grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+      <div className="no-print grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2">
         {reportList.map((r) => (
           <button
             key={r.id}
@@ -238,55 +238,70 @@ export const ReportsView: React.FC = () => {
       </div>
 
       {/* Printable Report Document Card */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
-        <div className="border-b border-slate-200 pb-4 flex justify-between items-center">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-4">
+        <div className="border-b border-slate-200 pb-4 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-2">
           <div>
-            <div className="text-xs font-bold text-brand-600">
-              Solar Operations Management System
-            </div>
-            <h2 className="text-base font-bold text-slate-900 mt-0.5">
+            <div className="text-sm font-bold text-brand-700">Solar Tracker</div>
+            <h2 className="text-lg font-bold text-slate-900 mt-0.5">
               {reportList.find((r) => r.id === activeReport)?.title}
             </h2>
-            <div className="text-xs text-slate-500 mt-1">
-              Generated: {new Date().toLocaleString('en-IN')} • Covers all records
+            <div className="text-sm text-slate-500 mt-1">
+              Made on {new Date().toLocaleString('en-IN')} · covers all records
             </div>
           </div>
-          <div className="text-right text-xs text-slate-400">
-            <div>Confidential • State Discom Operations</div>
-            <div>Total Rows: {reportData.length}</div>
+          <div className="text-sm font-bold text-slate-700">
+            {reportData.length} {reportData.length === 1 ? 'row' : 'rows'}
           </div>
         </div>
 
-        {/* Data Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
-              <tr>
-                {columns.map((c) => (
-                  <th key={c} className="py-3 px-3.5">
-                    {c}
-                  </th>
+        {reportData.length === 0 && (
+          <div className="py-10 text-center text-base text-slate-600">Nothing to show in this report right now.</div>
+        )}
+
+        {/* Smaller screens: one card per row, every column labelled */}
+        <ul className="2xl:hidden print:hidden space-y-3">
+          {reportData.map((row: any, i) => (
+            <li key={i} className="border-2 border-slate-200 rounded-xl p-4">
+              <div className="text-base font-bold text-slate-900 break-words">{String(row[columns[0]] ?? '')}</div>
+              <dl className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+                {columns.slice(1).map((c) => (
+                  <div key={c} className="min-w-0">
+                    <dt className="text-slate-500">{c}</dt>
+                    <dd className="font-semibold text-slate-900 break-words">{String(row[c] ?? '') || '—'}</dd>
+                  </div>
                 ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
-              {reportData.length === 0 && (
+              </dl>
+            </li>
+          ))}
+        </ul>
+
+        {/* Wide screens and printing: table */}
+        {reportData.length > 0 && (
+          <div className="hidden 2xl:block print:block relative overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
                 <tr>
-                  <td className="py-10 text-center text-sm text-slate-500">Nothing to show in this report right now.</td>
-                </tr>
-              )}
-              {reportData.map((row: any, i) => (
-                <tr key={i} className="hover:bg-slate-50">
                   {columns.map((c) => (
-                    <td key={c} className="py-3 px-3.5 font-medium">
-                      {String(row[c] ?? '')}
-                    </td>
+                    <th key={c} className="py-3 px-3.5">
+                      {c}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {reportData.map((row: any, i) => (
+                  <tr key={i} className="hover:bg-slate-50">
+                    {columns.map((c) => (
+                      <td key={c} className="py-3 px-3.5 font-medium">
+                        {String(row[c] ?? '')}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
