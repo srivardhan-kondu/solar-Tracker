@@ -17,6 +17,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import { canSeeTab } from '@/lib/access';
 
 interface AppSidebarProps {
   currentTab: string;
@@ -24,7 +25,7 @@ interface AppSidebarProps {
 }
 
 export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTab }) => {
-  const { exceptions, installations, dcrRecords } = useApp();
+  const { exceptions, installations, dcrRecords, currentUser } = useApp();
 
   const openExceptionsCount = exceptions.filter((e) => e.status === 'Open').length;
   const pendingInstCount = installations.filter(
@@ -41,79 +42,108 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTa
     },
     {
       id: 'field_portal',
-      label: 'Field Submission Web',
+      label: 'New Installation',
       icon: Smartphone,
       highlight: true,
-      badge: 'Live',
+      badge: undefined,
     },
     {
       id: 'installations',
-      label: 'Installations & Search',
+      label: 'Find a Consumer',
       icon: Users,
       badge: pendingInstCount > 0 ? pendingInstCount : undefined,
     },
     {
       id: 'master_upload',
-      label: 'Master Data Upload',
+      label: 'Upload Excel Lists',
       icon: Upload,
       badge: undefined,
     },
     {
       id: 'assignments',
-      label: 'Work Assignments',
+      label: 'Assign Work',
       icon: UserPlus,
       badge: undefined,
     },
     {
       id: 'inventory',
-      label: 'Inventory & Serials',
+      label: 'Panels & Inverters Stock',
       icon: Box,
       badge: undefined,
     },
     {
       id: 'dcr_module',
-      label: 'DCR Reconciliation',
+      label: 'DCR Numbers',
       icon: FileSpreadsheet,
       badge: dcrPendingCount > 0 ? dcrPendingCount : undefined,
     },
     {
       id: 'exceptions',
-      label: 'Action Required',
+      label: 'Problems to Fix',
       icon: AlertOctagon,
       badge: openExceptionsCount > 0 ? openExceptionsCount : undefined,
       badgeColor: 'bg-red-500 text-white',
     },
     {
       id: 'reports',
-      label: '10 Reports Hub',
+      label: 'Reports',
       icon: FileText,
       badge: undefined,
     },
     {
       id: 'service_desk',
-      label: 'Service Tickets Desk',
+      label: 'Service Complaints',
       icon: Wrench,
       badge: undefined,
     },
     {
       id: 'user_management',
-      label: 'Users & Permissions',
+      label: 'Users',
       icon: Shield,
       badge: undefined,
     },
     {
       id: 'audit_log',
-      label: 'Audit Trail',
+      label: 'Activity History',
       icon: History,
       badge: undefined,
     },
-  ];
+  ].filter((item) => canSeeTab(currentUser.role, item.id));
 
   return (
-    <aside className="no-print w-64 bg-white border-r border-slate-200 flex flex-col justify-between select-none">
+    <>
+    {/* Phones & small tablets: a scrollable strip instead of a fixed sidebar */}
+    <nav
+      aria-label="Main menu"
+      className="no-print md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 flex overflow-x-auto"
+    >
+      {menuItems.map((item) => {
+        const Icon = item.icon;
+        const isActive = currentTab === item.id;
+        return (
+          <button
+            key={item.id}
+            onClick={() => setCurrentTab(item.id)}
+            className={`relative flex-1 min-w-[84px] flex flex-col items-center gap-1 px-2 py-2.5 text-xs font-semibold ${
+              isActive ? 'text-brand-700 bg-brand-50' : 'text-slate-600'
+            }`}
+          >
+            <Icon className="w-5 h-5" />
+            <span className="text-center leading-tight">{item.label}</span>
+            {item.badge && (
+              <span className="absolute top-1 right-3 bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5">
+                {item.badge}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </nav>
+
+    <aside className="no-print hidden md:flex w-60 flex-shrink-0 bg-white border-r border-slate-200 flex-col justify-between select-none">
       <div className="p-4 space-y-1">
         <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-          Main Navigation
+          Menu
         </div>
 
         {menuItems.map((item) => {
@@ -123,7 +153,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTa
             <button
               key={item.id}
               onClick={() => setCurrentTab(item.id)}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+              className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold transition-all ${
                 isActive
                   ? 'bg-brand-600 text-white shadow-sm shadow-brand-500/20'
                   : item.highlight
@@ -155,14 +185,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTa
         })}
       </div>
 
-      {/* System Status info footer */}
-      <div className="p-4 border-t border-slate-100 text-xs text-slate-500 bg-slate-50/50">
-        <div className="flex items-center gap-2 text-slate-700 font-semibold mb-1">
-          <CheckCircle className="w-4 h-4 text-emerald-600" />
-          <span>System Healthy</span>
-        </div>
-        <p className="text-[11px] text-slate-400">PostgreSQL • Atomic Inventory Lock Enabled</p>
-      </div>
     </aside>
+    </>
   );
 };
