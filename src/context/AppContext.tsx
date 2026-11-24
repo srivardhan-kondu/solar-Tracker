@@ -70,6 +70,7 @@ interface AppContextType {
   dismissException: (exceptionId: string, reason: string) => void;
   approveInstallation: (installationId: string, notes?: string) => void;
   rejectInstallation: (installationId: string, notes: string) => void;
+  recordManualSerial: (serial: string, reason: string) => void;
   logAudit: (action: string, recordType: AuditEvent['recordType'], recordId: string, details: string, oldValue?: string, newValue?: string, reason?: string) => void;
   resetAllData: () => void;
 }
@@ -110,6 +111,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (parsed.exceptions) setExceptions(parsed.exceptions);
         if (parsed.auditLogs) setAuditLogs(parsed.auditLogs);
         if (parsed.offlineQueue) setOfflineQueue(parsed.offlineQueue);
+        if (parsed.installerDraft) setInstallerDraft(parsed.installerDraft);
+        if (parsed.activeStep) setActiveStep(parsed.activeStep);
       }
     } catch {
       console.warn('Could not load localStorage data, using seed defaults');
@@ -129,12 +132,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         exceptions,
         auditLogs,
         offlineQueue,
+        // Keep the in-progress installation so a page refresh never loses field work
+        installerDraft,
+        activeStep,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
     } catch {
       // quota or private mode
     }
-  }, [users, consumers, inventory, installations, dcrRecords, serviceTickets, exceptions, auditLogs, offlineQueue]);
+  }, [users, consumers, inventory, installations, dcrRecords, serviceTickets, exceptions, auditLogs, offlineQueue, installerDraft, activeStep]);
 
   // Audit Logger helper
   const logAudit = (
@@ -219,11 +225,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Serial verification against inventory (BR-002, BR-005, BR-006, BR-007)
   const scanPanel = (index: number, serial: string): { success: boolean; message: string; duplicateConsumer?: string } => {
     const cleanSerial = serial.trim().toUpperCase();
-    if (!cleanSerial) return { success: false, message: 'Please enter or scan a serial number.' };
+    if (!cleanSerial) return { success: false, message: 'Please scan or type the panel number first.' };
 
     // Check if already in current draft at another index
     if (installerDraft?.panels.some((p, i) => i !== index && p.toUpperCase() === cleanSerial)) {
-      return { success: false, message: `Panel serial ${cleanSerial} was already scanned for another slot in this installation!` };
+      return { success: false, message: `You already scanned panel ${cleanSerial} for another slot. Please scan a different panel.` };
     }
 
     // Check central inventory
@@ -234,7 +240,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!invItem) {
       return {
         success: false,
-        message: `Serial "${cleanSerial}" is NOT found in approved central inventory stock!`,
+        message: `Panel number ${cleanSerial} is not in our stock list. Check the label and scan again, or call your supervisor.`,
       };
     }
 
@@ -264,7 +270,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       return {
         success: false,
-        message: `Serial ${cleanSerial} is ALREADY locked to consumer ${invItem.linkedConsumerNumber}! Duplicate scan blocked and logged.`,
+        message: `Panel ${cleanSerial} is already fitted at another home (${invItem.linkedConsumerNumber}). Please use a different panel. The office has been informed.`,
         duplicateConsumer: invItem.linkedConsumerNumber,
       };
     }
@@ -272,7 +278,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (invItem.status === 'Damaged' || invItem.status === 'Quarantined') {
       return {
         success: false,
-        message: `Serial ${cleanSerial} is marked as ${invItem.status} in warehouse. Please select another panel.`,
+        message: `Panel ${cleanSerial} is marked "${invItem.status}" in the store. Please use a different panel.`,
       };
     }
 
@@ -285,13 +291,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return {
       success: true,
-      message: `Panel ${index + 1} (${cleanSerial}) validated successfully: ${invItem.brand} ${invItem.model}`,
+      message: `Panel ${index + 1} saved: ${cleanSerial} (${invItem.brand}).`,
     };
   };
 
   const scanInverter = (serial: string): { success: boolean; message: string; duplicateConsumer?: string } => {
     const cleanSerial = serial.trim().toUpperCase();
-    if (!cleanSerial) return { success: false, message: 'Please enter or scan an inverter serial number.' };
+    if (!cleanSerial) return { success: false, message: 'Please scan or type the inverter number first.' };
 
     const invItem = inventory.find(
       (item) => item.type === 'inverter' && item.serialNumber.toUpperCase() === cleanSerial
@@ -300,7 +306,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!invItem) {
       return {
         success: false,
-        message: `Inverter serial "${cleanSerial}" is NOT found in approved central inventory stock!`,
+        message: `Inverter number ${cleanSerial} is not in our stock list. Check the label and scan again, or call your supervisor.`,
       };
     }
 
@@ -322,7 +328,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       return {
         success: false,
-        message: `Inverter ${cleanSerial} is ALREADY installed at ${invItem.linkedConsumerNumber}! Duplicate scan blocked.`,
+        message: `Inverter ${cleanSerial} is already fitted at another home (${invItem.linkedConsumerNumber}). Please use a different inverter. The office has been informed.`,
         duplicateConsumer: invItem.linkedConsumerNumber,
       };
     }
@@ -330,7 +336,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (invItem.status === 'Damaged' || invItem.status === 'Quarantined') {
       return {
         success: false,
-        message: `Inverter ${cleanSerial} is marked as ${invItem.status} in warehouse.`,
+        message: `Inverter ${cleanSerial} is marked "${invItem.status}" in the store. Please use a different inverter.`,
       };
     }
 
@@ -340,7 +346,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return {
       success: true,
-      message: `Inverter (${cleanSerial}) verified: ${invItem.brand} ${invItem.model}`,
+      message: `Inverter saved: ${cleanSerial} (${invItem.brand}).`,
     };
   };
 
@@ -422,6 +428,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Queue in offline queue
       setOfflineQueue((prev) => [offlineItem, ...prev]);
 
+      setInstallerDraft(null);
+      setActiveStep(1);
+
       logAudit(
         'OFFLINE_SAVE',
         'Installation',
@@ -432,7 +441,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return {
         success: true,
         isOffline: true,
-        message: 'Saved on this device! Installation will synchronize automatically when internet connectivity returns.',
+        message: 'Saved on this phone. It will be sent to the office automatically when the internet comes back.',
       };
     }
 
@@ -512,17 +521,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setExceptions((prev) => [exc, ...prev]);
     }
 
+    setInstallerDraft(null);
+    setActiveStep(1);
+
     logAudit(
       'SUBMIT_INSTALLATION',
       'Installation',
       updatedInst.id,
-      `Installation for ${updatedInst.consumerNumber} received by server. 4 panels and 1 inverter locked.`
+      isComplete
+        ? `Installation for ${updatedInst.consumerNumber} received by server. 4 panels and 1 inverter locked.`
+        : `Installation for ${updatedInst.consumerNumber} received with missing items; sent for office review.`
     );
 
     return {
       success: true,
       isOffline: false,
-      message: 'Installation submitted and acknowledged by central server successfully!',
+      message: isComplete
+        ? 'Installation sent to the office successfully.'
+        : 'Installation sent, but some items are missing. The office will review it and may contact you.',
     };
   };
 
@@ -928,7 +944,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       )
     );
 
+    // Put the job back in the installer's list
+    const rejected = installations.find((i) => i.id === installationId);
+    if (rejected) {
+      setConsumers((prev) =>
+        prev.map((c) => (c.consumerNumber === rejected.consumerNumber ? { ...c, status: 'Needs Review' } : c))
+      );
+    }
+
     logAudit('REJECT_INSTALLATION', 'Installation', installationId, `Rejected by ${currentUser.name}. Reason: ${notes}`);
+  };
+
+  // Manual serial entry (camera/label damaged) must be recorded for audit (FR-INST-017)
+  const recordManualSerial = (serial: string, reason: string) => {
+    setInstallerDraft((prev) => {
+      if (!prev) return prev;
+      const prevReason = prev.manualSerialReason ? `${prev.manualSerialReason}; ` : '';
+      return { ...prev, manualSerialUsed: true, manualSerialReason: `${prevReason}${serial}: ${reason}` };
+    });
+    logAudit(
+      'MANUAL_SERIAL_ENTRY',
+      'Installation',
+      installerDraft?.id || 'unknown',
+      `Serial ${serial} typed manually for ${installerDraft?.consumerNumber || 'unknown consumer'}. Reason: ${reason}`
+    );
   };
 
   const resetAllData = () => {
@@ -943,6 +982,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAuditLogs(SEED_AUDIT_LOGS);
     setOfflineQueue([]);
     setInstallerDraft(null);
+    setActiveStep(1);
     localStorage.removeItem(STORAGE_KEY);
   };
 
@@ -989,6 +1029,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         dismissException,
         approveInstallation,
         rejectInstallation,
+        recordManualSerial,
         logAudit,
         resetAllData,
       }}
