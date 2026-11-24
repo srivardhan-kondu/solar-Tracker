@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { AppNavbar } from '@/components/layout/AppNavbar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
@@ -17,55 +17,74 @@ import { FieldSubmissionWebView } from '@/components/admin/FieldSubmissionWebVie
 import { UserManagementView } from '@/components/admin/UserManagementView';
 import { AuditLogView } from '@/components/admin/AuditLogView';
 import { Consumer360Modal } from '@/components/admin/Consumer360Modal';
+import { canSeeTab, HOME_TAB_FOR_ROLE } from '@/lib/access';
 
 export default function Home() {
-  const { selectedConsumerFor360, setSelectedConsumerFor360 } = useApp();
-  const [currentTab, setCurrentTab] = useState<string>('dashboard');
+  const { currentUser, consumers, selectedConsumerFor360, setSelectedConsumerFor360 } = useApp();
+  const [currentTab, setCurrentTab] = useState<string>(HOME_TAB_FOR_ROLE[currentUser.role]);
+  // Status filter carried into the installations list (e.g. from a dashboard card)
+  const [installationsFilter, setInstallationsFilter] = useState<string>('All');
+
+  // When the role changes, move to a screen that role is allowed to see
+  useEffect(() => {
+    if (!canSeeTab(currentUser.role, currentTab)) setCurrentTab(HOME_TAB_FOR_ROLE[currentUser.role]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser.role]);
+
+  const navigate = (tab: string, statusFilter?: string) => {
+    if (!canSeeTab(currentUser.role, tab)) return;
+    if (tab === 'installations') setInstallationsFilter(statusFilter || 'All');
+    setCurrentTab(tab);
+  };
+
+  const openConsumerByNumber = (consumerNumber: string) => {
+    const c = consumers.find((x) => x.consumerNumber === consumerNumber);
+    if (c) setSelectedConsumerFor360(c);
+  };
+
+  const show = (tab: string) => currentTab === tab && canSeeTab(currentUser.role, tab);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
       {/* Top Navigation */}
-      <AppNavbar onNavigateToTab={(tab) => setCurrentTab(tab)} />
+      <AppNavbar onNavigateToTab={(tab) => navigate(tab)} />
 
       {/* Main Body */}
       <div className="flex-1 flex max-w-7xl w-full mx-auto">
         {/* Left Sidebar */}
-        <AppSidebar currentTab={currentTab} setCurrentTab={setCurrentTab} />
+        <AppSidebar currentTab={currentTab} setCurrentTab={(tab) => navigate(tab)} />
 
         {/* Content Pane */}
-        <main className="flex-1 p-6 overflow-y-auto">
-          {currentTab === 'dashboard' && (
-            <DashboardView onNavigateToTab={(tab) => setCurrentTab(tab)} />
-          )}
+        <main className="flex-1 min-w-0 p-4 pb-28 sm:p-6 md:pb-6 overflow-y-auto">
+          {show('dashboard') && <DashboardView onNavigateToTab={navigate} />}
 
-          {currentTab === 'field_portal' && (
-            <FieldSubmissionWebView onFinished={() => setCurrentTab('installations')} />
-          )}
+          {show('field_portal') && <FieldSubmissionWebView onFinished={() => navigate('installations')} />}
 
-          {currentTab === 'installations' && (
+          {show('installations') && (
             <ConsumerSearchView
+              key={installationsFilter}
+              initialStatusFilter={installationsFilter}
               onSelectConsumer={(consumer) => setSelectedConsumerFor360(consumer)}
-              onNavigateToTab={(tab) => setCurrentTab(tab)}
             />
           )}
 
-          {currentTab === 'master_upload' && <MasterDataUploadView />}
+          {show('master_upload') && <MasterDataUploadView />}
 
-          {currentTab === 'assignments' && <AssignmentView />}
+          {show('assignments') && <AssignmentView />}
 
-          {currentTab === 'inventory' && <InventoryView />}
+          {show('inventory') && <InventoryView />}
 
-          {currentTab === 'dcr_module' && <DCRModuleView />}
+          {show('dcr_module') && <DCRModuleView />}
 
-          {currentTab === 'exceptions' && <ActionRequiredView />}
+          {show('exceptions') && <ActionRequiredView onSelectConsumerNumber={openConsumerByNumber} />}
 
-          {currentTab === 'reports' && <ReportsView />}
+          {show('reports') && <ReportsView />}
 
-          {currentTab === 'service_desk' && <ServiceTicketsAdminView />}
+          {show('service_desk') && <ServiceTicketsAdminView />}
 
-          {currentTab === 'user_management' && <UserManagementView />}
+          {show('user_management') && <UserManagementView />}
 
-          {currentTab === 'audit_log' && <AuditLogView />}
+          {show('audit_log') && <AuditLogView />}
         </main>
       </div>
 
@@ -76,7 +95,7 @@ export default function Home() {
           onClose={() => setSelectedConsumerFor360(null)}
           onNavigateToTab={(tab) => {
             setSelectedConsumerFor360(null);
-            setCurrentTab(tab);
+            navigate(tab);
           }}
         />
       )}
