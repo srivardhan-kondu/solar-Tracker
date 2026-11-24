@@ -12,11 +12,13 @@ import {
   ShieldAlert,
   Save,
   Loader2,
+  Pencil,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { Installation, PhotoCategory, PhotoEvidence, GpsLocation } from '@/types';
 import {
   isStepDone,
+  TOTAL_STEPS,
   stepBlocker,
   missingItems,
   panelsDone,
@@ -66,8 +68,7 @@ const PHOTO_GUIDES: Record<PhotoCategory, { title: string; hint: string; sampleU
 };
 
 const STEP_TITLES = [
-  'Choose consumer',
-  'Check details',
+  'Check home & details',
   'Scan 4 panels',
   'Scan inverter',
   'Take 7 photos',
@@ -100,6 +101,7 @@ export const FieldSubmissionWebView: React.FC<{
     updateDraft,
     surveys,
     installations,
+    updateConsumerMobile,
   } = useApp();
 
   // Installers see only their own jobs; office staff see every open job.
@@ -115,6 +117,9 @@ export const FieldSubmissionWebView: React.FC<{
   const [selectedConsumerNum, setSelectedConsumerNum] = useState<string>('');
   const [panelInput, setPanelInput] = useState<string[]>(['', '', '', '']);
   const [inverterInput, setInverterInput] = useState<string>('');
+  const [editingMobile, setEditingMobile] = useState(false);
+  const [mobileInput, setMobileInput] = useState('');
+  const [mobileError, setMobileError] = useState<string | null>(null);
   const [validationAlert, setValidationAlert] = useState<{ text: string; success: boolean } | null>(null);
   const [submitted, setSubmitted] = useState<{
     result: { success: boolean; isOffline: boolean; message: string };
@@ -144,6 +149,7 @@ export const FieldSubmissionWebView: React.FC<{
     setPanelInput(['', '', '', '']);
     setInverterInput('');
     setSubmitted(null);
+    setEditingMobile(false);
     startOrResumeInstallation(cNum);
   };
 
@@ -400,21 +406,21 @@ export const FieldSubmissionWebView: React.FC<{
           <div className="sm:hidden bg-white rounded-2xl border border-slate-200 p-4 space-y-2">
             <div className="flex justify-between items-baseline">
               <span className="text-lg font-bold text-slate-900">
-                {t('Step {n} of {total}', { n: activeStep, total: 7 })}
+                {t('Step {n} of {total}', { n: activeStep, total: TOTAL_STEPS })}
               </span>
               <span className="text-sm text-slate-600">{t(STEP_TITLES[activeStep - 1])}</span>
             </div>
             <div className="h-3 bg-slate-200 rounded-full overflow-hidden">
-              <div className="h-full bg-brand-600 rounded-full" style={{ width: `${(activeStep / 7) * 100}%` }} />
+              <div className="h-full bg-brand-600 rounded-full" style={{ width: `${(activeStep / TOTAL_STEPS) * 100}%` }} />
             </div>
           </div>
 
           {/* Step Indicators — status comes from the actual data, not the step number */}
-          <div className="hidden sm:grid grid-cols-4 lg:grid-cols-7 gap-2">
+          <div className="hidden sm:grid grid-cols-3 lg:grid-cols-6 gap-2">
             {STEP_TITLES.map((title, i) => {
               const stepNum = i + 1;
               const isCurrent = activeStep === stepNum;
-              const isDone = stepNum < 7 && isStepDone(installerDraft, stepNum);
+              const isDone = stepNum < TOTAL_STEPS && isStepDone(installerDraft, stepNum);
               const openable = canOpenStep(stepNum);
               return (
                 <button
@@ -462,66 +468,123 @@ export const FieldSubmissionWebView: React.FC<{
           )}
 
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-6">
-            {/* STEP 1 */}
+            {/* STEP 1: right home + details with the consumer (mobile number can be corrected) */}
             {activeStep === 1 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-bold text-slate-900">{t("Step 1 — Is this the right home?")}</h3>
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <span className="text-slate-500">{t("Consumer number")}</span>
-                    <div className="font-mono font-bold text-slate-900 mt-0.5">{currentConsumer?.consumerNumber}</div>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">{t("Name")}</span>
-                    <div className="font-bold text-slate-900 mt-0.5">{currentConsumer?.name}</div>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">{t("Village")}</span>
-                    <div className="font-semibold text-slate-800 mt-0.5">
-                      {currentConsumer?.village}, {currentConsumer?.mandal}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">{t("System size")}</span>
-                    <div className="font-bold text-brand-600 mt-0.5">
-                      {t('{kw} kW (4 panels + 1 inverter)', { kw: currentConsumer?.capacityKw })}
-                    </div>
-                  </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">{t("Step 1 — Check the home and details")}</h3>
+                  <p className="text-sm text-slate-500">
+                    {t("Make sure this is the right home, then read these details out to the consumer. If the mobile number is wrong, tap Change number.")}
+                  </p>
                 </div>
-                <div className="flex justify-end pt-4">
-                  <button onClick={() => goTo(2)} className={btnPrimary}>
-                    <span>{t("Yes, continue")}</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* STEP 2 */}
-            {activeStep === 2 && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-bold text-slate-900">{t("Step 2 — Check the details with the consumer")}</h3>
-                <p className="text-sm text-slate-500">{t("Read these out to the consumer. If something is wrong, tell the office. You cannot change it here.")}</p>
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-sm max-w-xl">
-                  {[
-                    ['Name', currentConsumer?.name],
-                    ['Mobile number', currentConsumer?.mobile],
-                    ['ULA number (from the scheme paperwork)', currentConsumer?.ula],
-                    ['Division', currentConsumer?.division],
-                  ].map(([label, value]) => (
-                    <div key={label} className="flex justify-between gap-4 py-2 border-b border-slate-200 last:border-0">
-                      <span className="text-slate-500">{t(label as string)}</span>
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-sm max-w-2xl">
+                  {(
+                    [
+                      ['Consumer number', <span key="n" className="font-mono">{currentConsumer?.consumerNumber}</span>],
+                      ['Name', currentConsumer?.name],
+                      ['Village', `${currentConsumer?.village}, ${currentConsumer?.mandal}`],
+                      ['ULA number (from the scheme paperwork)', <span key="u" className="font-mono">{currentConsumer?.ula}</span>],
+                      ['Division', currentConsumer?.division],
+                      ['System size', t('{kw} kW (4 panels + 1 inverter)', { kw: currentConsumer?.capacityKw })],
+                    ] as [string, React.ReactNode][]
+                  ).map(([label, value]) => (
+                    <div key={label} className="flex justify-between gap-4 py-2 border-b border-slate-200">
+                      <span className="text-slate-500">{t(label)}</span>
                       <span className="font-semibold text-slate-900 text-right">{value}</span>
                     </div>
                   ))}
+
+                  {/* Mobile number: shown with the previous number if it was changed */}
+                  <div className="py-2 space-y-2">
+                    <div className="flex justify-between items-start gap-4">
+                      <span className="text-slate-500">{t("Mobile number")}</span>
+                      <div className="text-right">
+                        <div className="font-semibold text-slate-900 flex items-center justify-end gap-2 flex-wrap">
+                          {currentConsumer?.previousMobile && (
+                            <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">{t("Updated")}</span>
+                          )}
+                          {currentConsumer?.mobile}
+                        </div>
+                        {currentConsumer?.previousMobile && (
+                          <div className="text-xs text-slate-500 mt-0.5">
+                            {t("Previous number")}: <span className="line-through">{currentConsumer.previousMobile}</span>
+                            <br />
+                            {t('Changed by {who} on {when}', { who: currentConsumer.mobileUpdatedBy, when: currentConsumer.mobileUpdatedAt })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {editingMobile ? (
+                      <form
+                        className="p-3 bg-white rounded-xl border-2 border-brand-300 space-y-2"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if (!currentConsumer) return;
+                          const res = updateConsumerMobile(currentConsumer.consumerNumber, mobileInput);
+                          if (res.success) {
+                            setEditingMobile(false);
+                            setMobileError(null);
+                            setValidationAlert({ text: res.message, success: true });
+                          } else setMobileError(res.message);
+                        }}
+                      >
+                        <label className="block space-y-1">
+                          <span className="text-sm font-bold text-slate-800">{t("New mobile number")}</span>
+                          <input
+                            type="tel"
+                            inputMode="numeric"
+                            autoComplete="off"
+                            autoFocus
+                            value={mobileInput}
+                            onChange={(e) => {
+                              setMobileInput(e.target.value);
+                              setMobileError(null);
+                            }}
+                            placeholder={t("10-digit mobile number")}
+                            className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-base font-mono"
+                          />
+                        </label>
+                        {mobileError && (
+                          <div className="text-sm font-semibold text-red-700" role="alert">
+                            {mobileError}
+                          </div>
+                        )}
+                        <div className="flex gap-2 justify-end">
+                          <button type="button" onClick={() => setEditingMobile(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-700">
+                            {t("Cancel")}
+                          </button>
+                          <button type="submit" className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-bold">
+                            {t("Save number")}
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMobileInput('');
+                            setMobileError(null);
+                            setEditingMobile(true);
+                          }}
+                          className="px-4 py-2 border-2 border-brand-300 text-brand-700 bg-white hover:bg-brand-50 rounded-lg text-sm font-bold flex items-center gap-1.5"
+                        >
+                          <Pencil className="w-4 h-4" />
+                          {t("Change number")}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex justify-between pt-4">
-                  <button onClick={() => goTo(1)} className={btnBack}>{t("Back")}</button>
+                <div className="flex justify-end pt-2">
                   <button
                     onClick={() => {
                       updateDraft({ consumerConfirmed: true });
-                      goTo(3);
+                      goTo(2);
                     }}
+                    disabled={editingMobile}
+                    title={editingMobile ? t("Save or cancel the new mobile number first") : undefined}
                     className={btnPrimary}
                   >
                     <span>{t("Details are correct")}</span>
@@ -531,12 +594,12 @@ export const FieldSubmissionWebView: React.FC<{
               </div>
             )}
 
-            {/* STEP 3 */}
-            {activeStep === 3 && (
+            {/* STEP 2 */}
+            {activeStep === 2 && (
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-3">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900">{t("Step 3 — Scan the 4 panels")}</h3>
+                    <h3 className="text-lg font-bold text-slate-900">{t("Step 2 — Scan the 4 panels")}</h3>
                     <p className="text-sm text-slate-500">{t("Type the number from each panel's label, or tap the stock number below it.")}</p>
                   </div>
                   <span className="self-start sm:self-auto text-sm font-bold bg-brand-50 text-brand-700 px-3 py-1 rounded-full whitespace-nowrap">
@@ -602,14 +665,14 @@ export const FieldSubmissionWebView: React.FC<{
                   })}
                 </div>
 
-                <StepFooter step={3} nextLabel="Next: inverter" />
+                <StepFooter step={2} nextLabel="Next: inverter" />
               </div>
             )}
 
-            {/* STEP 4 */}
-            {activeStep === 4 && (
+            {/* STEP 3 */}
+            {activeStep === 3 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-bold text-slate-900">{t("Step 4 — Scan the inverter")}</h3>
+                <h3 className="text-lg font-bold text-slate-900">{t("Step 3 — Scan the inverter")}</h3>
 
                 <div className="max-w-md p-5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
                   {installerDraft.inverterSerial ? (
@@ -652,16 +715,16 @@ export const FieldSubmissionWebView: React.FC<{
                   </div>
                 </div>
 
-                <StepFooter step={4} nextLabel="Next: photos" />
+                <StepFooter step={3} nextLabel="Next: photos" />
               </div>
             )}
 
-            {/* STEP 5 */}
-            {activeStep === 5 && (
+            {/* STEP 4 */}
+            {activeStep === 4 && (
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-3">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900">{t("Step 5 — Take 7 photos")}</h3>
+                    <h3 className="text-lg font-bold text-slate-900">{t("Step 4 — Take 7 photos")}</h3>
                     <p className="text-sm text-slate-500">{t("Take each photo as shown. All 7 are needed for the subsidy.")}</p>
                   </div>
                   <span className="self-start sm:self-auto text-sm font-bold bg-brand-50 text-brand-700 px-3 py-1 rounded-full whitespace-nowrap">
@@ -734,14 +797,14 @@ export const FieldSubmissionWebView: React.FC<{
                   />
                 )}
 
-                <StepFooter step={5} nextLabel="Next: location" />
+                <StepFooter step={4} nextLabel="Next: location" />
               </div>
             )}
 
-            {/* STEP 6 */}
-            {activeStep === 6 && (
+            {/* STEP 5 */}
+            {activeStep === 5 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-bold text-slate-900">{t("Step 6 — Capture the location")}</h3>
+                <h3 className="text-lg font-bold text-slate-900">{t("Step 5 — Capture the location")}</h3>
                 <p className="text-sm text-slate-500">{t("Stand near the panels, outside if you can, then tap the button.")}</p>
 
                 <div className="max-w-md p-5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
@@ -816,16 +879,23 @@ export const FieldSubmissionWebView: React.FC<{
                   )}
                 </div>
 
-                <StepFooter step={6} nextLabel="Next: check & send" />
+                <StepFooter step={5} nextLabel="Next: check & send" />
               </div>
             )}
 
-            {/* STEP 7 */}
-            {activeStep === 7 &&
+            {/* STEP 6 */}
+            {activeStep === 6 &&
               (() => {
                 const missing = missingItems(installerDraft, t);
                 const rows: [string, string, boolean][] = [
                   ['Consumer', `${currentConsumer?.name} (${currentConsumer?.consumerNumber})`, installerDraft.consumerConfirmed],
+                  [
+                    'Mobile number',
+                    currentConsumer?.previousMobile
+                      ? `${currentConsumer.mobile} (${t('was {old}', { old: currentConsumer.previousMobile })})`
+                      : currentConsumer?.mobile || '—',
+                    true,
+                  ],
                   ['Panels', t('{n} of {total}', { n: panelsDone(installerDraft), total: 4 }), panelsDone(installerDraft) === 4],
                   ['Inverter', installerDraft.inverterSerial || t('Not scanned'), !!installerDraft.inverterSerial],
                   ['Photos', t('{n} of {total}', { n: photosDone(installerDraft), total: 7 }), photosDone(installerDraft) === 7],
@@ -833,7 +903,7 @@ export const FieldSubmissionWebView: React.FC<{
                 ];
                 return (
                   <div className="space-y-4">
-                    <h3 className="text-lg font-bold text-slate-900">{t("Step 7 — Check everything and send")}</h3>
+                    <h3 className="text-lg font-bold text-slate-900">{t("Step 6 — Check everything and send")}</h3>
 
                     <div className="p-5 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-sm max-w-lg">
                       {rows.map(([label, value, ok]) => (
@@ -859,7 +929,7 @@ export const FieldSubmissionWebView: React.FC<{
                     )}
 
                     <div className="flex justify-between pt-4">
-                      <button onClick={() => goTo(6)} className={btnBack}>{t("Back")}</button>
+                      <button onClick={() => goTo(5)} className={btnBack}>{t("Back")}</button>
                       <button
                         onClick={handleSubmitFinal}
                         disabled={missing.length > 0}

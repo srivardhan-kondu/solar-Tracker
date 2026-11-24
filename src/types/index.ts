@@ -81,6 +81,10 @@ export interface Consumer {
   assignedInstallerName?: string;
   assignedDate?: string;
   capacityKw: number;
+  /** The number from the original list, kept when an installer changes the mobile number */
+  previousMobile?: string;
+  mobileUpdatedBy?: string;
+  mobileUpdatedAt?: string;
 }
 
 export interface EquipmentInventory {

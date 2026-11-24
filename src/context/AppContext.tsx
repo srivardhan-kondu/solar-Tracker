@@ -32,6 +32,8 @@ import { useLang } from '@/i18n/LanguageContext';
 import { canInstall, reopenBlocker, surveyMissing } from '@/lib/survey';
 import { SyncState, uploadPhoto, useServerSync } from '@/lib/serverSync';
 import { hasGeo } from '@/lib/geoPhoto';
+import { normalizeMobile, sameMobile } from '@/lib/mobile';
+import { resumeStep } from '@/lib/installationSteps';
 import { AllData, CollectionKey, DbRecord } from '@/lib/tables';
 
 interface AppContextType {
@@ -89,6 +91,8 @@ interface AppContextType {
   /** Change a survey that has not been sent yet; starts one if needed. */
   updateSurveyDraft: (consumerNumber: string, change: (s: SiteSurvey) => SiteSurvey) => void;
   submitSurvey: (consumerNumber: string) => { success: boolean; message: string };
+  /** Installer or office: correct a consumer's mobile number. The original number is kept as "previous". */
+  updateConsumerMobile: (consumerNumber: string, newMobile: string) => { success: boolean; message: string };
   /** Office only: send a survey back to the installer to be done again */
   reopenSurvey: (consumerNumber: string, reason: string) => { success: boolean; message: string };
 }
@@ -136,8 +140,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (parsed.exceptions) setExceptions(parsed.exceptions);
         if (parsed.auditLogs) setAuditLogs(parsed.auditLogs);
         if (parsed.offlineQueue) setOfflineQueue(parsed.offlineQueue);
-        if (parsed.installerDraft) setInstallerDraft(parsed.installerDraft);
-        if (parsed.activeStep) setActiveStep(parsed.activeStep);
+        if (parsed.installerDraft) {
+          setInstallerDraft(parsed.installerDraft);
+          // Work out the step from the job itself (step numbers changed when steps 1 and 2 were merged)
+          setActiveStep(resumeStep(parsed.installerDraft));
+        }
       }
       const savedSurveys = localStorage.getItem(SURVEY_STORAGE_KEY);
       if (savedSurveys) setSurveys(JSON.parse(savedSurveys));
@@ -217,13 +224,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const existing = installations.find((i) => i.consumerNumber === consumerNumber);
     if (existing) {
       setInstallerDraft({ ...existing });
-      // Determine resume step
-      if (!existing.consumerConfirmed) setActiveStep(2);
-      else if (existing.panels.some((p) => !p)) setActiveStep(3);
-      else if (!existing.inverterSerial) setActiveStep(4);
-      else if (Object.keys(existing.photos).length < 7) setActiveStep(5);
-      else if (!existing.gps) setActiveStep(6);
-      else setActiveStep(7);
+      setActiveStep(resumeStep(existing));
       return;
     }
 
@@ -1082,6 +1083,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
+  const updateConsumerMobile = (consumerNumber: string, newMobile: string): { success: boolean; message: string } => {
+    const consumer = consumers.find((c) => c.consumerNumber === consumerNumber);
+    if (!consumer) return { success: false, message: t('Consumer not found.') };
+    const mobile = normalizeMobile(newMobile);
+    if (!mobile) return { success: false, message: t('Please enter a valid 10-digit mobile number (starting with 6, 7, 8 or 9).') };
+    if (sameMobile(mobile, consumer.mobile)) return { success: false, message: t('This is the same as the current number.') };
+
+    const original = consumer.previousMobile ?? consumer.mobile;
+    const backToOriginal = sameMobile(mobile, original);
+    const timestamp = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+    setConsumers((prev) =>
+      prev.map((c) =>
+        c.consumerNumber !== consumerNumber
+          ? c
+          : backToOriginal
+          ? { ...c, mobile: original, previousMobile: undefined, mobileUpdatedBy: undefined, mobileUpdatedAt: undefined }
+          : { ...c, mobile, previousMobile: original, mobileUpdatedBy: currentUser.name, mobileUpdatedAt: timestamp }
+      )
+    );
+    logAudit(
+      'UPDATE_MOBILE',
+      'Consumer',
+      consumerNumber,
+      `Mobile number changed by ${currentUser.name} from ${consumer.mobile} to ${mobile}.`,
+      consumer.mobile,
+      mobile
+    );
+    return { success: true, message: t('Mobile number updated.') };
+  };
+
   const reopenSurvey = (consumerNumber: string, reason: string): { success: boolean; message: string } => {
     if (currentUser.role !== 'Admin' && currentUser.role !== 'Super Admin')
       return { success: false, message: t('Only office staff can reopen a survey.') };
@@ -1302,6 +1333,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateSurveyDraft,
         submitSurvey,
         reopenSurvey,
+        updateConsumerMobile,
       }}
     >
       {children}

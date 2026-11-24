@@ -52,7 +52,8 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
             c.name.toLowerCase().includes(q) ||
             c.ula.toLowerCase().includes(q) ||
             c.village.toLowerCase().includes(q) ||
-            (qDigits.length >= 3 && c.mobile.replace(/\D/g, '').includes(qDigits))
+            (qDigits.length >= 3 &&
+              [c.mobile, c.previousMobile].some((m) => !!m && m.replace(/\D/g, '').includes(qDigits)))
         )
         .slice(0, 6)
     : [];

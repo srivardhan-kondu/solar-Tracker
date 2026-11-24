@@ -210,6 +210,16 @@ export const Consumer360Modal: React.FC<{
                   </div>
                   <div className="text-xs text-slate-500 mt-2">{t("Installer:")}{" "}<span className="font-semibold text-slate-800">{consumer.assignedInstallerName || t("Unassigned")}</span>
                   </div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    {t("Mobile:")} <span className="font-semibold text-slate-800">{consumer.mobile}</span>
+                    {consumer.previousMobile && (
+                      <span className="block mt-0.5">
+                        {t("Previous number")}: <span className="line-through">{consumer.previousMobile}</span>
+                        {' · '}
+                        {t('Changed by {who} on {when}', { who: consumer.mobileUpdatedBy, when: consumer.mobileUpdatedAt })}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">

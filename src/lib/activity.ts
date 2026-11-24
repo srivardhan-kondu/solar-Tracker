@@ -17,6 +17,7 @@ const ACTION_LABEL: Record<string, string> = {
   REJECT_INSTALLATION: 'Installation sent back',
   SUBMIT_SURVEY: 'Site survey sent',
   REOPEN_SURVEY: 'Site survey reopened',
+  UPDATE_MOBILE: 'Mobile number changed',
 };
 
 export const friendly = (code: string) =>

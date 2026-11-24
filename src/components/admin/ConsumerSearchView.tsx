@@ -65,7 +65,8 @@ export const ConsumerSearchView: React.FC<{
       c.ula.toLowerCase().includes(q) ||
       c.village.toLowerCase().includes(q) ||
       // Match mobile numbers regardless of spaces or +91
-      (qDigits.length >= 3 && c.mobile.replace(/\D/g, '').includes(qDigits));
+      (qDigits.length >= 3 &&
+        [c.mobile, c.previousMobile].some((m) => !!m && m.replace(/\D/g, '').includes(qDigits)));
 
     const matchesStatus = matchesStatusFilter(c.status, statusFilter);
     const matchesDivision = divisionFilter === 'All' || c.division === divisionFilter;
@@ -80,6 +81,7 @@ export const ConsumerSearchView: React.FC<{
         'Consumer Number': c.consumerNumber,
         'Beneficiary Name': c.name,
         'Mobile Number': c.mobile,
+        'Previous Mobile Number': c.previousMobile || '',
         Village: c.village,
         Mandal: c.mandal,
         District: c.district,
@@ -211,7 +213,7 @@ export const ConsumerSearchView: React.FC<{
                 <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
                   <div><dt className="inline text-slate-500">{t("Village:")}{" "}</dt><dd className="inline text-slate-900">{c.village}, {c.division}</dd></div>
                   <div><dt className="inline text-slate-500">{t("Installer:")}{" "}</dt><dd className="inline text-slate-900">{c.assignedInstallerName || t("Not assigned")}</dd></div>
-                  <div><dt className="inline text-slate-500">{t("Mobile:")}{" "}</dt><dd className="inline text-slate-900">{c.mobile}</dd></div>
+                  <div><dt className="inline text-slate-500">{t("Mobile:")}{" "}</dt><dd className="inline text-slate-900">{c.mobile}{c.previousMobile && <span className="text-slate-500"> ({t('was {old}', { old: c.previousMobile })})</span>}</dd></div>
                   <div className="break-all"><dt className="inline text-slate-500">{t("ULA:")}{" "}</dt><dd className="inline font-mono text-slate-900">{c.ula}</dd></div>
                   <div className="sm:col-span-2 break-all">
                     <dt className="inline text-slate-500">{t("DCR:")}{" "}</dt>
@@ -253,7 +255,9 @@ export const ConsumerSearchView: React.FC<{
                         <div className="text-base font-bold text-slate-900">{c.name}</div>
                         <div className="font-mono text-sm text-slate-700">{c.consumerNumber}</div>
                         <div className="text-sm text-slate-500">
-                          {c.mobile} · {t('ULA')} <span className="font-mono">{c.ula}</span>
+                          {c.mobile}
+                          {c.previousMobile && <span className="text-slate-500"> ({t('was {old}', { old: c.previousMobile })})</span>} · {t('ULA')}{' '}
+                          <span className="font-mono">{c.ula}</span>
                         </div>
                       </td>
                       <td className="py-4 px-4">
