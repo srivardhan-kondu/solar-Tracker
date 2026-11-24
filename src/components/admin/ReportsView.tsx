@@ -16,10 +16,19 @@ import { useApp } from '@/context/AppContext';
 import * as XLSX from 'xlsx';
 
 export const ReportsView: React.FC = () => {
-  const { consumers, installations, dcrRecords, exceptions, inventory } = useApp();
+  const { consumers, installations, dcrRecords, exceptions, inventory, users } = useApp();
 
   const [activeReport, setActiveReport] = useState<string>('daily_installation');
-  const [dateRange, setDateRange] = useState('2026-11-20 to 2026-11-24');
+
+  const pct = (part: number, total: number) => `${total > 0 ? Math.round((part / total) * 100) : 0}%`;
+  const groupBy = <T,>(items: T[], key: (t: T) => string) => {
+    const m = new Map<string, T[]>();
+    items.forEach((it) => {
+      const k = key(it) || 'Not given';
+      m.set(k, [...(m.get(k) || []), it]);
+    });
+    return Array.from(m.entries()).sort(([a], [b]) => a.localeCompare(b));
+  };
 
   const reportList = [
     { id: 'daily_installation', title: '1. Daily Installation Report' },
@@ -51,41 +60,49 @@ export const ReportsView: React.FC = () => {
         }));
 
       case 'installer_performance':
-        return [
-          {
-            Installer: 'Ramesh Kumar',
-            Division: 'Guntur Central',
-            Assigned: 4,
-            Completed: 1,
-            'In Progress': 3,
-            'Missing Evidence Rate': '25%',
-          },
-          {
-            Installer: 'Suresh Patil',
-            Division: 'Tenali Rural',
-            Assigned: 2,
-            Completed: 1,
-            'In Progress': 1,
-            'Missing Evidence Rate': '0%',
-          },
-        ];
+        return users
+          .filter((u) => u.role === 'Installer')
+          .map((u) => {
+            const assigned = consumers.filter((c) => c.assignedInstallerId === u.id);
+            const done = assigned.filter((c) => c.status === 'Completed').length;
+            const insts = installations.filter((i) => i.installerId === u.id);
+            const withMissing = insts.filter(
+              (i) => Object.keys(i.photos || {}).length < 7 || !i.gps || i.panels.some((p) => !p) || !i.inverterSerial
+            ).length;
+            return {
+              Installer: u.name,
+              Division: u.division,
+              Assigned: assigned.length,
+              Done: done,
+              'Not finished': assigned.length - done,
+              'Submissions with missing items': `${withMissing} of ${insts.length}`,
+            };
+          });
 
       case 'division_progress':
-        return [
-          { Division: 'Guntur Central', Target: 5, Completed: 1, Pending: 4, 'Completion Rate': '20%' },
-          { Division: 'Tenali Rural', Target: 2, Completed: 1, Pending: 1, 'Completion Rate': '50%' },
-          { Division: 'Palnadu West', Target: 1, Completed: 0, Pending: 1, 'Completion Rate': '0%' },
-        ];
+        return groupBy(consumers, (c) => c.division).map(([division, list]) => {
+          const done = list.filter((c) => c.status === 'Completed').length;
+          return {
+            Division: division,
+            Consumers: list.length,
+            Done: done,
+            'Not finished': list.length - done,
+            'Done %': pct(done, list.length),
+          };
+        });
 
       case 'village_progress':
-        return [
-          { Village: 'Pedakakani', Mandal: 'Guntur Rural', Assigned: 1, Completed: 1, Status: '100%' },
-          { Village: 'Narakodur', Mandal: 'Chebrolu', Assigned: 1, Completed: 0, Status: 'Needs Review' },
-          { Village: 'Kaza', Mandal: 'Mangalagiri', Assigned: 1, Completed: 0, Status: 'In Progress' },
-          { Village: 'Chinna Kakani', Mandal: 'Mangalagiri', Assigned: 1, Completed: 0, Status: 'In Progress' },
-          { Village: 'Atchampet', Mandal: 'Atchampet', Assigned: 1, Completed: 0, Status: 'Assigned' },
-          { Village: 'Kollipara', Mandal: 'Tenali', Assigned: 1, Completed: 1, Status: '100%' },
-        ];
+        return groupBy(consumers, (c) => `${c.village}|${c.mandal}`).map(([key, list]) => {
+          const [village, mandal] = key.split('|');
+          const done = list.filter((c) => c.status === 'Completed').length;
+          return {
+            Village: village,
+            Mandal: mandal || '',
+            Consumers: list.length,
+            Done: done,
+            'Done %': pct(done, list.length),
+          };
+        });
 
       case 'dcr_pending':
         return dcrRecords
@@ -178,9 +195,9 @@ export const ReportsView: React.FC = () => {
       {/* Header */}
       <div className="no-print bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">10 Operational Reports Hub</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Full compliance reports with XLSX export and formal printable previews as per Section 7.9.
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Reports</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Pick a report below. You can print it or download it as Excel.
           </p>
         </div>
 
@@ -194,7 +211,8 @@ export const ReportsView: React.FC = () => {
           </button>
           <button
             onClick={handleExportXLSX}
-            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-colors"
+            disabled={reportData.length === 0}
+            className="disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-colors"
           >
             <Download className="w-4 h-4" />
             <span>Export Excel (.xlsx)</span>
@@ -230,7 +248,7 @@ export const ReportsView: React.FC = () => {
               {reportList.find((r) => r.id === activeReport)?.title}
             </h2>
             <div className="text-xs text-slate-500 mt-1">
-              Generated: {new Date().toLocaleString('en-IN')} • Date Range: {dateRange}
+              Generated: {new Date().toLocaleString('en-IN')} • Covers all records
             </div>
           </div>
           <div className="text-right text-xs text-slate-400">
@@ -252,6 +270,11 @@ export const ReportsView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
+              {reportData.length === 0 && (
+                <tr>
+                  <td className="py-10 text-center text-sm text-slate-500">Nothing to show in this report right now.</td>
+                </tr>
+              )}
               {reportData.map((row: any, i) => (
                 <tr key={i} className="hover:bg-slate-50">
                   {columns.map((c) => (
