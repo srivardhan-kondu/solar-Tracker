@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
   User,
@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { Consumer, PhotoEvidence } from '@/types';
+import { missingItems } from '@/lib/installationSteps';
+import { STATUS_LABEL } from '@/lib/status';
 
 export const Consumer360Modal: React.FC<{
   consumer: Consumer;
@@ -40,7 +42,19 @@ export const Consumer360Modal: React.FC<{
   const [activePhotoPreview, setActivePhotoPreview] = useState<PhotoEvidence | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'evidence' | 'service' | 'audit'>('overview');
   const [approvalNotes, setApprovalNotes] = useState('');
-  const [showApprovalBox, setShowApprovalBox] = useState(false);
+  const [reviewMode, setReviewMode] = useState<'none' | 'approve' | 'reject'>('none');
+  const [reviewDone, setReviewDone] = useState<string | null>(null);
+
+  // Esc closes the photo preview first, then the window
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (activePhotoPreview) setActivePhotoPreview(null);
+      else onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [activePhotoPreview, onClose]);
 
   const installation = installations.find((i) => i.consumerNumber === consumer.consumerNumber);
   const consumerDcr = dcrRecords.find((d) => d.consumerNumber === consumer.consumerNumber || d.ula === consumer.ula);
@@ -51,9 +65,21 @@ export const Consumer360Modal: React.FC<{
   );
 
   const isAdminOrSuper = currentUser.role === 'Admin' || currentUser.role === 'Super Admin';
+  const missing = installation ? missingItems(installation) : [];
+  // Only installations that have been sent in and not yet approved can be reviewed
+  const reviewable =
+    !!installation &&
+    installation.officeApprovalStatus !== 'Approved' &&
+    (installation.status === 'Received by Server' || installation.status === 'Needs Review');
 
   return (
-    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div
+      className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Details for ${consumer.name}`}
+    >
       <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
@@ -76,7 +102,7 @@ export const Consumer360Modal: React.FC<{
                       : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                   }`}
                 >
-                  {consumer.status}
+                  {STATUS_LABEL[consumer.status]}
                 </span>
               </div>
               <p className="text-xs text-slate-400">
@@ -88,6 +114,7 @@ export const Consumer360Modal: React.FC<{
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
+              aria-label="Close"
               className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
             >
               <X className="w-5 h-5" />
@@ -160,7 +187,7 @@ export const Consumer360Modal: React.FC<{
                   </span>
                   <div className="mt-1 flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                    <span className="text-base font-bold text-slate-900">{consumer.status}</span>
+                    <span className="text-base font-bold text-slate-900">{STATUS_LABEL[consumer.status]}</span>
                   </div>
                   <div className="text-xs text-slate-500 mt-2">
                     Installer: <span className="font-semibold text-slate-800">{consumer.assignedInstallerName || 'Unassigned'}</span>
@@ -270,31 +297,114 @@ export const Consumer360Modal: React.FC<{
               {/* Office Approval Actions (FR-ADM-004) */}
               {isAdminOrSuper && installation && (
                 <div className="bg-brand-50/50 border border-brand-200 rounded-xl p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900">Office Review & Sign-Off</h4>
-                      <p className="text-xs text-slate-600">
-                        Verify evidence before marking completed and releasing for DCR / subsidy submission.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => approveInstallation(installation.id, approvalNotes)}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm"
-                      >
-                        Approve Installation
-                      </button>
-                      <button
-                        onClick={() => {
-                          const note = prompt('Please enter rejection reason:');
-                          if (note) rejectInstallation(installation.id, note);
-                        }}
-                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-sm"
-                      >
-                        Reject / Flag Discrepancy
-                      </button>
-                    </div>
+                  <div>
+                    <h4 className="text-base font-bold text-slate-900">Office check</h4>
+                    <p className="text-sm text-slate-600">
+                      Look at the photos and serial numbers before approving. Approved jobs are marked Done.
+                    </p>
                   </div>
+
+                  {reviewDone && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-900 font-semibold">
+                      {reviewDone}
+                    </div>
+                  )}
+
+                  {installation.officeApprovalStatus === 'Approved' ? (
+                    <div className="text-sm text-emerald-800">
+                      ✓ Approved by {installation.approvedBy} on {installation.approvedAt}
+                      {installation.officeApprovalNotes ? ` — "${installation.officeApprovalNotes}"` : ''}
+                    </div>
+                  ) : !reviewable ? (
+                    <div className="text-sm text-slate-600">
+                      This job has not been sent by the installer yet, so it cannot be checked.
+                    </div>
+                  ) : (
+                    <>
+                      {missing.length > 0 && (
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900">
+                          <div className="font-bold">Not everything was sent:</div>
+                          <ul className="list-disc pl-5">
+                            {missing.map((m) => (
+                              <li key={m}>{m}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {reviewMode === 'none' && (
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            onClick={() => {
+                              setApprovalNotes('');
+                              setReviewMode('approve');
+                            }}
+                            disabled={missing.length > 0}
+                            title={missing.length > 0 ? 'Cannot approve while items are missing' : undefined}
+                            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-sm disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => {
+                              setApprovalNotes('');
+                              setReviewMode('reject');
+                            }}
+                            className="px-5 py-2.5 bg-white border border-red-300 text-red-700 hover:bg-red-50 rounded-lg text-sm font-bold"
+                          >
+                            Send back to installer
+                          </button>
+                        </div>
+                      )}
+
+                      {reviewMode !== 'none' && (
+                        <div className="space-y-2">
+                          <label className="block text-sm font-bold text-slate-800">
+                            {reviewMode === 'approve'
+                              ? 'Note (optional)'
+                              : 'What needs to be fixed? (required — the installer will see this)'}
+                          </label>
+                          <textarea
+                            value={approvalNotes}
+                            onChange={(e) => setApprovalNotes(e.target.value)}
+                            autoFocus
+                            className="w-full p-2.5 border border-slate-300 rounded-lg text-sm h-20"
+                            placeholder={
+                              reviewMode === 'approve'
+                                ? 'e.g. All photos checked'
+                                : 'e.g. Meter photo is blurry, please take it again'
+                            }
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setReviewMode('none')}
+                              className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-700"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              disabled={reviewMode === 'reject' && !approvalNotes.trim()}
+                              onClick={() => {
+                                if (reviewMode === 'approve') {
+                                  approveInstallation(installation.id, approvalNotes.trim() || undefined);
+                                  setReviewDone('Approved. This job is now marked Done.');
+                                } else {
+                                  rejectInstallation(installation.id, approvalNotes.trim());
+                                  setReviewDone('Sent back to the installer with your note.');
+                                }
+                                setReviewMode('none');
+                              }}
+                              className={`px-5 py-2 text-white rounded-lg text-sm font-bold disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed ${
+                                reviewMode === 'approve' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
+                              }`}
+                            >
+                              {reviewMode === 'approve' ? 'Yes, approve' : 'Send back'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -374,7 +484,8 @@ export const Consumer360Modal: React.FC<{
                               />
                               <button
                                 onClick={() => setActivePhotoPreview(photo)}
-                                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"
+                                aria-label={`Open ${item.title}`}
+                                className="absolute inset-0 bg-black/0 hover:bg-black/40 opacity-100 transition-colors flex items-center justify-center text-white"
                               >
                                 <Maximize2 className="w-6 h-6" />
                               </button>
@@ -463,6 +574,7 @@ export const Consumer360Modal: React.FC<{
             <div className="space-y-4">
               <h3 className="text-sm font-bold text-slate-900">Immutable Audit Trail</h3>
               <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                {consumerLogs.length === 0 && <p className="text-sm text-slate-500">No activity recorded yet.</p>}
                 {consumerLogs.map((log) => (
                   <div key={log.id} className="relative">
                     <div className="absolute -left-6 top-1 w-3.5 h-3.5 rounded-full bg-brand-600 border-2 border-white" />
@@ -500,6 +612,7 @@ export const Consumer360Modal: React.FC<{
             </div>
             <button
               onClick={() => setActivePhotoPreview(null)}
+              aria-label="Close photo"
               className="p-2 bg-white/10 hover:bg-white/20 rounded-full"
             >
               <X className="w-5 h-5 text-white" />
