@@ -15,7 +15,14 @@ import { useApp } from '@/context/AppContext';
 import { ServiceTicket } from '@/types';
 
 export const ServiceTicketsAdminView: React.FC = () => {
-  const { serviceTickets, consumers, createServiceTicket, updateServiceTicketStatus } = useApp();
+  const { serviceTickets, consumers, users, currentUser, createServiceTicket, updateServiceTicketStatus } = useApp();
+  const engineers = users.filter((u) => u.role === 'Service Engineer' && u.status === 'Active');
+  const isEngineer = currentUser.role === 'Service Engineer';
+  const [showClosed, setShowClosed] = useState(false);
+  // Engineers see only their own tickets; open tickets first
+  const visibleTickets = serviceTickets
+    .filter((t) => !isEngineer || t.assignedEngineerId === currentUser.id)
+    .filter((t) => showClosed || (t.status !== 'Resolved' && t.status !== 'Closed'));
 
   const [createModal, setCreateModal] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<ServiceTicket | null>(null);
@@ -25,14 +32,21 @@ export const ServiceTicketsAdminView: React.FC = () => {
   const [consumerNum, setConsumerNum] = useState('');
   const [issueCategory, setIssueCategory] = useState<ServiceTicket['issueCategory']>('Inverter Fault');
   const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState<ServiceTicket['priority']>('High');
+  const [priority, setPriority] = useState<ServiceTicket['priority']>('Medium');
+  const [engineerId, setEngineerId] = useState<string>('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   const handleCreateTicket = () => {
     const consumer = consumers.find((c) => c.consumerNumber === consumerNum);
-    if (!consumer || !description.trim()) {
-      alert('Please select a valid consumer and provide issue description.');
+    if (!consumer) {
+      setFormError('Please choose the consumer.');
       return;
     }
+    if (!description.trim()) {
+      setFormError('Please describe the problem.');
+      return;
+    }
+    const engineer = engineers.find((e) => e.id === engineerId);
 
     createServiceTicket({
       consumerNumber: consumer.consumerNumber,
@@ -43,15 +57,18 @@ export const ServiceTicketsAdminView: React.FC = () => {
       issueCategory,
       description,
       priority,
-      status: 'Created',
-      assignedEngineerId: 'usr_005',
-      assignedEngineerName: 'Vikram Singh',
+      status: engineer ? 'Assigned' : 'Created',
+      assignedEngineerId: engineer?.id,
+      assignedEngineerName: engineer?.name,
       dueDate: new Date(Date.now() + 48 * 3600 * 1000).toISOString().split('T')[0],
     });
 
     setCreateModal(false);
     setConsumerNum('');
     setDescription('');
+    setPriority('Medium');
+    setEngineerId('');
+    setFormError(null);
   };
 
   const handleCloseTicket = () => {
@@ -66,24 +83,41 @@ export const ServiceTicketsAdminView: React.FC = () => {
       {/* Header */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Service & Maintenance Desk</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Log consumer breakdowns, assign service engineers, and record onsite visit reports.
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+            {isEngineer ? 'My Service Jobs' : 'Service Complaints'}
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            {isEngineer
+              ? 'Complaints assigned to you. Close each one after your visit.'
+              : 'Record a consumer complaint and choose an engineer to visit.'}
           </p>
         </div>
 
+        <label className="flex items-center gap-2 text-sm text-slate-600">
+          <input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} className="w-4 h-4" />
+          Show closed
+        </label>
+
         <button
-          onClick={() => setCreateModal(true)}
+          onClick={() => {
+            setFormError(null);
+            setCreateModal(true);
+          }}
           className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-colors"
         >
           <Plus className="w-4 h-4" />
-          <span>Create Service Ticket</span>
+          <span>New complaint</span>
         </button>
       </div>
 
       {/* Ticket List */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {serviceTickets.map((t) => (
+        {visibleTickets.length === 0 && (
+          <div className="md:col-span-2 py-12 text-center text-sm text-slate-500 bg-white rounded-2xl border border-slate-200">
+            {isEngineer ? 'No open jobs assigned to you.' : 'No open complaints.'}
+          </div>
+        )}
+        {visibleTickets.map((t) => (
           <div
             key={t.id}
             className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow space-y-3"
@@ -145,7 +179,7 @@ export const ServiceTicketsAdminView: React.FC = () => {
                 onClick={() => setSelectedTicket(t)}
                 className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm transition-colors"
               >
-                Resolve & Close Ticket
+                Close after visit
               </button>
             )}
           </div>
@@ -156,7 +190,13 @@ export const ServiceTicketsAdminView: React.FC = () => {
       {createModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200">
-            <h3 className="text-base font-bold text-slate-900">Create New Service Ticket</h3>
+            <h3 className="text-base font-bold text-slate-900">New complaint</h3>
+
+            {formError && (
+              <div role="alert" className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-sm text-red-900">
+                {formError}
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Select Consumer</label>
@@ -191,11 +231,41 @@ export const ServiceTicketsAdminView: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Problem Description</label>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">How urgent?</label>
+                  <select
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value as ServiceTicket['priority'])}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl text-sm"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Urgent">Urgent</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Engineer</label>
+                  <select
+                    value={engineerId}
+                    onChange={(e) => setEngineerId(e.target.value)}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl text-sm"
+                  >
+                    <option value="">Choose later</option>
+                    {engineers.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.name} ({e.division})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">What is the problem?</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe fault details reported by consumer..."
+                placeholder="e.g. Inverter shows red light since Monday, no power at night"
                 className="w-full p-2.5 border border-slate-300 rounded-xl text-xs h-20"
               />
             </div>
@@ -211,7 +281,7 @@ export const ServiceTicketsAdminView: React.FC = () => {
                 onClick={handleCreateTicket}
                 className="px-4 py-2 bg-brand-600 text-white rounded-xl text-xs font-bold shadow-md"
               >
-                Save Ticket
+                Save complaint
               </button>
             </div>
           </div>
@@ -226,7 +296,7 @@ export const ServiceTicketsAdminView: React.FC = () => {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Technician Visit Findings & Closure Notes
+                What did you find and fix? (required)
               </label>
               <textarea
                 value={closureNotes}
@@ -245,9 +315,10 @@ export const ServiceTicketsAdminView: React.FC = () => {
               </button>
               <button
                 onClick={handleCloseTicket}
-                className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-md"
+                disabled={!closureNotes.trim()}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold shadow-md disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed"
               >
-                Confirm Closure
+                Close complaint
               </button>
             </div>
           </div>
