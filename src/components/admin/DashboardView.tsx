@@ -7,227 +7,245 @@ import {
   Clock,
   FileSpreadsheet,
   AlertTriangle,
-  MapPin,
-  Camera,
   Wrench,
   TrendingUp,
   ArrowUpRight,
   Filter,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import { STATUS_GROUPS, matchesStatusFilter, uniqueSorted } from '@/lib/status';
+
+const pct = (part: number, total: number) => (total > 0 ? Math.round((part / total) * 100) : 0);
 
 export const DashboardView: React.FC<{
-  onNavigateToTab: (tab: string) => void;
-  onFilterStatus?: (status: string) => void;
-}> = ({ onNavigateToTab, onFilterStatus }) => {
-  const { consumers, installations, dcrRecords, exceptions, serviceTickets, inventory } = useApp();
+  onNavigateToTab: (tab: string, statusFilter?: string) => void;
+}> = ({ onNavigateToTab }) => {
+  const { consumers, users, dcrRecords, exceptions, serviceTickets, inventory } = useApp();
 
   const [divisionFilter, setDivisionFilter] = useState('All');
+  const divisions = uniqueSorted(consumers.map((c) => c.division));
 
-  // Filtered dataset
-  const filteredConsumers = divisionFilter === 'All'
-    ? consumers
-    : consumers.filter((c) => c.division === divisionFilter);
+  const filteredConsumers =
+    divisionFilter === 'All' ? consumers : consumers.filter((c) => c.division === divisionFilter);
 
-  // Key metrics calculation
-  const totalAssigned = filteredConsumers.length;
-  const completed = filteredConsumers.filter((c) => c.status === 'Completed').length;
-  const pending = filteredConsumers.filter(
-    (c) => c.status === 'Assigned' || c.status === 'In Progress' || c.status === 'Saved Locally'
-  ).length;
-  const needsReview = filteredConsumers.filter((c) => c.status === 'Needs Review').length;
+  const count = (filter: string) => filteredConsumers.filter((c) => matchesStatusFilter(c.status, filter)).length;
+
+  const total = filteredConsumers.length;
+  const completed = count('group:done');
+  const notFinished = count('group:not_done');
+  const officeCheck = count('group:office_check');
   const dcrPending = dcrRecords.filter((d) => d.status === 'ULA Not Found' || d.status === 'Existing Value Conflict').length;
-  const openExceptions = exceptions.filter((e) => e.status === 'Open').length;
-  const openTickets = serviceTickets.filter((t) => t.status !== 'Closed' && t.status !== 'Resolved').length;
+  const openExceptions = exceptions.filter(
+    (e) => e.status === 'Open' && (divisionFilter === 'All' || e.division === divisionFilter)
+  ).length;
+  const openTickets = serviceTickets.filter(
+    (t) => t.status !== 'Closed' && t.status !== 'Resolved' && (divisionFilter === 'All' || t.division === divisionFilter)
+  ).length;
 
   const totalPanels = inventory.filter((i) => i.type === 'panel').length;
   const installedPanels = inventory.filter((i) => i.type === 'panel' && i.status === 'Installed').length;
+
+  // Real progress per division (always across all divisions, so they can be compared)
+  const divisionRows = divisions.map((name) => {
+    const list = consumers.filter((c) => c.division === name);
+    return { name, total: list.length, done: list.filter((c) => c.status === 'Completed').length };
+  });
+
+  // Real installer performance
+  const installerRows = users
+    .filter((u) => u.role === 'Installer')
+    .map((u) => {
+      const list = filteredConsumers.filter((c) => c.assignedInstallerId === u.id);
+      return {
+        id: u.id,
+        name: u.name,
+        division: u.division,
+        assigned: list.length,
+        done: list.filter((c) => c.status === 'Completed').length,
+        working: list.filter((c) => matchesStatusFilter(c.status, 'group:working')).length,
+      };
+    });
+
+  const kpis = [
+    {
+      label: 'All consumers',
+      value: total,
+      note: 'Click to see the full list',
+      icon: Users,
+      color: 'text-slate-900',
+      iconColor: 'text-brand-600',
+      onClick: () => onNavigateToTab('installations', 'All'),
+    },
+    {
+      label: 'Done',
+      value: completed,
+      note: `${pct(completed, total)}% of all consumers`,
+      icon: CheckCircle2,
+      color: 'text-emerald-700',
+      iconColor: 'text-emerald-600',
+      onClick: () => onNavigateToTab('installations', 'group:done'),
+    },
+    {
+      label: 'Not finished yet',
+      value: notFinished,
+      note: 'Not started or being installed',
+      icon: Clock,
+      color: 'text-blue-700',
+      iconColor: 'text-blue-600',
+      onClick: () => onNavigateToTab('installations', 'group:not_done'),
+    },
+    {
+      label: STATUS_GROUPS.office_check.label,
+      value: officeCheck,
+      note: 'Sent by installers, check & approve',
+      icon: ClipboardCheck,
+      color: 'text-violet-700',
+      iconColor: 'text-violet-600',
+      onClick: () => onNavigateToTab('installations', 'group:office_check'),
+    },
+    {
+      label: 'Problems to fix',
+      value: openExceptions,
+      note: 'Missing photos, location, duplicates',
+      icon: AlertTriangle,
+      color: 'text-red-600',
+      iconColor: 'text-red-600',
+      onClick: () => onNavigateToTab('exceptions'),
+    },
+  ];
 
   return (
     <div className="space-y-6">
       {/* Top Banner & Division Filter */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Solar Operations Dashboard</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Real-time installation progress, inventory locking, and DCR reconciliation status.
-          </p>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Dashboard</h1>
+          <p className="text-sm text-slate-500 mt-0.5">How the work is going today. Click any box to see the list.</p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <label className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-slate-400" />
-          <span className="text-xs font-semibold text-slate-600">Division:</span>
+          <span className="text-sm font-semibold text-slate-600">Division:</span>
           <select
             value={divisionFilter}
             onChange={(e) => setDivisionFilter(e.target.value)}
-            className="text-xs font-semibold bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="text-sm font-semibold bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
           >
-            <option value="All">All Divisions (Statewide)</option>
-            <option value="Guntur Central">Guntur Central</option>
-            <option value="Tenali Rural">Tenali Rural</option>
-            <option value="Palnadu West">Palnadu West</option>
+            <option value="All">All divisions</option>
+            {divisions.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
           </select>
-        </div>
+        </label>
       </div>
 
-      {/* Operational KPI Cards (Clickable per Section 7.1) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Total Assigned */}
-        <button
-          onClick={() => onNavigateToTab('installations')}
-          className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-brand-300 hover:shadow-md transition-all text-left group"
-        >
-          <div className="flex justify-between items-start">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Assigned Total</span>
-            <Users className="w-5 h-5 text-brand-600 group-hover:scale-110 transition-transform" />
-          </div>
-          <div className="text-2xl font-extrabold text-slate-900 mt-2">{totalAssigned}</div>
-          <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-            <span>Consumers across divisions</span>
-            <ArrowUpRight className="w-3 h-3 text-brand-600 ml-auto" />
-          </div>
-        </button>
-
-        {/* Completed */}
-        <button
-          onClick={() => onNavigateToTab('installations')}
-          className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-emerald-300 hover:shadow-md transition-all text-left group"
-        >
-          <div className="flex justify-between items-start">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Completed</span>
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition-transform" />
-          </div>
-          <div className="text-2xl font-extrabold text-emerald-700 mt-2">{completed}</div>
-          <div className="text-[11px] text-emerald-600 mt-1 font-semibold flex items-center justify-between">
-            <span>{totalAssigned > 0 ? Math.round((completed / totalAssigned) * 100) : 0}% of target</span>
-            <ArrowUpRight className="w-3 h-3 text-emerald-600" />
-          </div>
-        </button>
-
-        {/* Pending Installations */}
-        <button
-          onClick={() => onNavigateToTab('installations')}
-          className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-blue-300 hover:shadow-md transition-all text-left group"
-        >
-          <div className="flex justify-between items-start">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">In Progress / Pending</span>
-            <Clock className="w-5 h-5 text-blue-600 group-hover:scale-110 transition-transform" />
-          </div>
-          <div className="text-2xl font-extrabold text-blue-700 mt-2">{pending}</div>
-          <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
-            <span>Field work active</span>
-            <ArrowUpRight className="w-3 h-3 text-blue-600" />
-          </div>
-        </button>
-
-        {/* Action Required Exceptions */}
-        <button
-          onClick={() => onNavigateToTab('exceptions')}
-          className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-red-300 hover:shadow-md transition-all text-left group"
-        >
-          <div className="flex justify-between items-start">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Action Required</span>
-            <AlertTriangle className="w-5 h-5 text-red-600 group-hover:scale-110 transition-transform" />
-          </div>
-          <div className="text-2xl font-extrabold text-red-600 mt-2">{openExceptions}</div>
-          <div className="text-[11px] text-red-500 mt-1 font-semibold flex items-center justify-between">
-            <span>Missing photos / GPS issues</span>
-            <ArrowUpRight className="w-3 h-3 text-red-600" />
-          </div>
-        </button>
+      {/* KPI cards: each opens the matching filtered list */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        {kpis.map((k) => {
+          const Icon = k.icon;
+          return (
+            <button
+              key={k.label}
+              onClick={k.onClick}
+              className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-brand-300 hover:shadow-md transition-all text-left group"
+            >
+              <div className="flex justify-between items-start gap-2">
+                <span className="text-sm font-bold text-slate-600">{k.label}</span>
+                <Icon className={`w-5 h-5 flex-shrink-0 ${k.iconColor}`} />
+              </div>
+              <div className={`text-3xl font-extrabold mt-2 ${k.color}`}>{k.value}</div>
+              <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                <span>{k.note}</span>
+                <ArrowUpRight className="w-3 h-3 ml-auto flex-shrink-0" />
+              </div>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Second Row: DCR Status, Service Tickets, Equipment Lock Summary */}
+      {/* Second Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* DCR Pending */}
         <button
           onClick={() => onNavigateToTab('dcr_module')}
           className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-brand-300 transition-all text-left"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-700 flex items-center gap-2">
+            <span className="text-sm font-bold text-slate-700 flex items-center gap-2">
               <FileSpreadsheet className="w-4 h-4 text-brand-600" />
-              DCR Reconciliation
+              DCR numbers
             </span>
-            <span className="text-xs font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded">
-              {dcrPending} Exceptions
+            <span
+              className={`text-sm font-bold px-2 py-0.5 rounded ${
+                dcrPending ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'
+              }`}
+            >
+              {dcrPending ? `${dcrPending} need attention` : 'All matched'}
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-            ULA to DCR mapping verified. Automatically updates matched consumers and flags unmatched rows.
-          </p>
+          <p className="text-sm text-slate-500 mt-2">DCR rows from the uploaded file that could not be matched to a consumer.</p>
         </button>
 
-        {/* Service Tickets */}
         <button
           onClick={() => onNavigateToTab('service_desk')}
           className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-brand-300 transition-all text-left"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-700 flex items-center gap-2">
+            <span className="text-sm font-bold text-slate-700 flex items-center gap-2">
               <Wrench className="w-4 h-4 text-blue-600" />
-              Service Tickets Desk
+              Service complaints
             </span>
-            <span className="text-xs font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
-              {openTickets} Open
-            </span>
+            <span className="text-sm font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded">{openTickets} open</span>
           </div>
-          <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-            Consumer maintenance tickets, engineer site visits, and replacement records.
-          </p>
+          <p className="text-sm text-slate-500 mt-2">Repair and maintenance requests from consumers.</p>
         </button>
 
-        {/* Inventory Stock Status */}
         <button
           onClick={() => onNavigateToTab('inventory')}
           className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-brand-300 transition-all text-left"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-700 flex items-center gap-2">
+            <span className="text-sm font-bold text-slate-700 flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-emerald-600" />
-              Inventory Stock & Serials
+              Panel stock
             </span>
-            <span className="text-xs font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded">
-              {installedPanels}/{totalPanels} Installed
+            <span className="text-sm font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded">
+              {installedPanels} of {totalPanels} fitted
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-            Server-side atomic serial validation locks equipment to a single consumer record.
-          </p>
+          <p className="text-sm text-slate-500 mt-2">{totalPanels - installedPanels} panels are still in the store or not usable.</p>
         </button>
       </div>
 
-      {/* Progress Breakdown Tables: Division & Village */}
+      {/* Progress tables, calculated from live data */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Division Progress */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
           <div className="flex justify-between items-center">
-            <h3 className="text-sm font-bold text-slate-900">Progress by Division</h3>
+            <h3 className="text-base font-bold text-slate-900">Progress by division</h3>
             <button
               onClick={() => onNavigateToTab('reports')}
-              className="text-xs font-bold text-brand-600 hover:text-brand-700"
+              className="text-sm font-bold text-brand-600 hover:text-brand-700"
             >
-              View Full Report →
+              Full report →
             </button>
           </div>
 
           <div className="space-y-3">
-            {[
-              { name: 'Guntur Central', total: 5, comp: 1, pending: 4 },
-              { name: 'Tenali Rural', total: 2, comp: 1, pending: 1 },
-              { name: 'Palnadu West', total: 1, comp: 0, pending: 1 },
-            ].map((d) => (
+            {divisionRows.length === 0 && <p className="text-sm text-slate-500">No consumers uploaded yet.</p>}
+            {divisionRows.map((d) => (
               <div key={d.name} className="space-y-1.5">
-                <div className="flex justify-between text-xs font-medium text-slate-700">
+                <div className="flex justify-between text-sm font-medium text-slate-700">
                   <span>{d.name}</span>
                   <span className="text-slate-500">
-                    {d.comp} / {d.total} ({Math.round((d.comp / d.total) * 100)}%)
+                    {d.done} of {d.total} done ({pct(d.done, d.total)}%)
                   </span>
                 </div>
                 <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
                   <div
                     className="bg-brand-600 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${(d.comp / d.total) * 100}%` }}
+                    style={{ width: `${pct(d.done, d.total)}%` }}
                   />
                 </div>
               </div>
@@ -235,32 +253,30 @@ export const DashboardView: React.FC<{
           </div>
         </div>
 
-        {/* Installer Performance */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
           <div className="flex justify-between items-center">
-            <h3 className="text-sm font-bold text-slate-900">Installer Performance</h3>
+            <h3 className="text-base font-bold text-slate-900">Installers</h3>
             <button
-              onClick={() => onNavigateToTab('reports')}
-              className="text-xs font-bold text-brand-600 hover:text-brand-700"
+              onClick={() => onNavigateToTab('assignments')}
+              className="text-sm font-bold text-brand-600 hover:text-brand-700"
             >
-              Performance Report →
+              Assign work →
             </button>
           </div>
 
           <div className="divide-y divide-slate-100">
-            {[
-              { name: 'Ramesh Kumar', role: 'Installer', assigned: 4, completed: 1, inProgress: 3 },
-              { name: 'Suresh Patil', role: 'Installer', assigned: 2, completed: 1, inProgress: 1 },
-            ].map((inst) => (
-              <div key={inst.name} className="py-2.5 flex justify-between items-center text-xs">
+            {installerRows.map((inst) => (
+              <div key={inst.id} className="py-3 flex justify-between items-center text-sm gap-3">
                 <div>
                   <div className="font-bold text-slate-900">{inst.name}</div>
-                  <div className="text-[11px] text-slate-500">{inst.role} • Guntur Division</div>
+                  <div className="text-xs text-slate-500">
+                    {inst.division} · {inst.assigned} assigned
+                  </div>
                 </div>
                 <div className="text-right">
-                  <span className="font-bold text-emerald-600">{inst.completed} Completed</span>
-                  <span className="text-slate-400 mx-1">•</span>
-                  <span className="text-slate-600">{inst.inProgress} In Progress</span>
+                  <span className="font-bold text-emerald-600">{inst.done} done</span>
+                  <span className="text-slate-400 mx-1">·</span>
+                  <span className="text-slate-600">{inst.working} in progress</span>
                 </div>
               </div>
             ))}
