@@ -15,12 +15,12 @@ export const MobileTopBar: React.FC<{ title?: string; onBack?: () => void }> = (
         <span>{timeStr}</span>
         <div className="flex items-center gap-2">
           {isOnline ? (
-            <span className="flex items-center gap-1 text-emerald-400 text-[11px]">
+            <span className="flex items-center gap-1 text-emerald-400 text-xs">
               <Signal className="w-3 h-3" />
               <span>4G LTE</span>
             </span>
           ) : (
-            <span className="flex items-center gap-1 text-amber-400 text-[11px] font-semibold">
+            <span className="flex items-center gap-1 text-amber-400 text-xs font-semibold">
               <WifiOff className="w-3 h-3" />
               <span>OFFLINE</span>
             </span>
@@ -28,7 +28,7 @@ export const MobileTopBar: React.FC<{ title?: string; onBack?: () => void }> = (
           <BatteryCharging className="w-3.5 h-3.5 text-emerald-400" />
           <button
             onClick={() => setIsOnline(!isOnline)}
-            className={`text-[10px] px-1.5 py-0.5 rounded font-mono transition-colors ${
+            className={`text-xs px-1.5 py-0.5 rounded font-mono transition-colors ${
               isOnline ? 'bg-emerald-950 text-emerald-300 hover:bg-emerald-900' : 'bg-amber-950 text-amber-300 hover:bg-amber-900'
             }`}
             title="Click to toggle network state simulation"
@@ -57,7 +57,7 @@ export const MobileTopBar: React.FC<{ title?: string; onBack?: () => void }> = (
           </div>
           <div className="flex items-center gap-2">
             {!isOnline && (
-              <span className="bg-amber-500/20 text-amber-200 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-400/30 uppercase tracking-wider">
+              <span className="bg-amber-500/20 text-amber-200 text-xs font-bold px-2 py-0.5 rounded border border-amber-400/30">
                 Field Mode
               </span>
             )}

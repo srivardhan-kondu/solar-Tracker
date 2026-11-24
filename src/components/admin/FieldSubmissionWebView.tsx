@@ -26,37 +26,37 @@ const PHOTO_GUIDES: Record<PhotoCategory, { title: string; hint: string; sampleU
   front: {
     title: '1. Front view of the panels',
     hint: 'Stand back so all 4 panels are in the photo.',
-    sampleUrl: 'https://images.unsplash.com/photo-1509391365360-2e959784a276?w=600&auto=format&fit=crop',
+    sampleUrl: '/samples/front.svg',
   },
   side: {
     title: '2. Side view (tilt)',
     hint: 'Take from the side so the slope of the stand is clear.',
-    sampleUrl: 'https://images.unsplash.com/photo-1508873696983-2df5293cb32b?w=600&auto=format&fit=crop',
+    sampleUrl: '/samples/side.svg',
   },
   consumer: {
     title: '3. Consumer with the system',
     hint: 'Consumer standing near the panels, holding their electricity bill or ID.',
-    sampleUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&auto=format&fit=crop',
+    sampleUrl: '/samples/consumer.svg',
   },
   meter: {
     title: '4. Net meter',
     hint: 'Close-up so the meter numbers and the seal can be read.',
-    sampleUrl: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=600&auto=format&fit=crop',
+    sampleUrl: '/samples/meter.svg',
   },
   inverter: {
     title: '5. Inverter',
     hint: 'Inverter on the wall, with the barcode label and lights visible.',
-    sampleUrl: 'https://images.unsplash.com/photo-1558441719-8b489c63f732?w=600&auto=format&fit=crop',
+    sampleUrl: '/samples/inverter.svg',
   },
   structure: {
     title: '6. Stand and bolts',
     hint: 'Close-up of the bolts and base of the panel stand.',
-    sampleUrl: 'https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?w=600&auto=format&fit=crop',
+    sampleUrl: '/samples/structure.svg',
   },
   earthing: {
     title: '7. Earthing',
     hint: 'The earthing pit and the green earth wire.',
-    sampleUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600&auto=format&fit=crop',
+    sampleUrl: '/samples/earthing.svg',
   },
 };
 
@@ -312,8 +312,21 @@ export const FieldSubmissionWebView: React.FC<{
         </div>
       ) : (
         <>
+          {/* Phones: one simple progress line instead of 7 boxes */}
+          <div className="sm:hidden bg-white rounded-2xl border border-slate-200 p-4 space-y-2">
+            <div className="flex justify-between items-baseline">
+              <span className="text-lg font-bold text-slate-900">
+                Step {activeStep} of 7
+              </span>
+              <span className="text-sm text-slate-600">{STEP_TITLES[activeStep - 1]}</span>
+            </div>
+            <div className="h-3 bg-slate-200 rounded-full overflow-hidden">
+              <div className="h-full bg-brand-600 rounded-full" style={{ width: `${(activeStep / 7) * 100}%` }} />
+            </div>
+          </div>
+
           {/* Step Indicators — status comes from the actual data, not the step number */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+          <div className="hidden sm:grid grid-cols-4 lg:grid-cols-7 gap-2">
             {STEP_TITLES.map((title, i) => {
               const stepNum = i + 1;
               const isCurrent = activeStep === stepNum;
@@ -324,11 +337,13 @@ export const FieldSubmissionWebView: React.FC<{
                   key={title}
                   onClick={() => openable && goTo(stepNum)}
                   disabled={!openable}
-                  className={`p-3 rounded-xl border text-left transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
+                  className={`p-3 rounded-xl border-2 text-left transition-all disabled:cursor-not-allowed ${
+                    !openable && !isDone ? 'opacity-60' : ''
+                  } ${
                     isCurrent
                       ? 'bg-brand-600 text-white border-brand-600 font-bold shadow-sm'
                       : isDone
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200 font-semibold'
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold'
                       : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                   }`}
                 >

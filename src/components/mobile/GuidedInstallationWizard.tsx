@@ -25,37 +25,37 @@ const PHOTO_GUIDES: Record<PhotoCategory, { title: string; hint: string; sampleU
   front: {
     title: 'Front View (Solar Array)',
     hint: 'Capture complete rooftop solar panel layout facing south with clear tilt visible.',
-    sampleUrl: 'https://images.unsplash.com/photo-1509391365360-2e959784a276?w=600&auto=format&fit=crop',
+    sampleUrl: '/samples/front.svg',
   },
   side: {
     title: 'Side View & Tilt Angle',
     hint: 'Show structural slope angle and clearance from roof surface.',
-    sampleUrl: 'https://images.unsplash.com/photo-1508873696983-2df5293cb32b?w=600&auto=format&fit=crop',
+    sampleUrl: '/samples/side.svg',
   },
   consumer: {
     title: 'Beneficiary with Installation',
     hint: 'Consumer standing near equipment holding their Aadhaar or Consumer Bill.',
-    sampleUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&auto=format&fit=crop',
+    sampleUrl: '/samples/consumer.svg',
   },
   meter: {
     title: 'Bi-directional Net Meter',
     hint: 'Close-up of meter display showing reading and Discom meter seal intact.',
-    sampleUrl: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=600&auto=format&fit=crop',
+    sampleUrl: '/samples/meter.svg',
   },
   inverter: {
     title: 'Inverter & AC/DC DB',
     hint: 'Inverter wall mount showing serial barcode and LEDs on normal status.',
-    sampleUrl: 'https://images.unsplash.com/photo-1558441719-8b489c63f732?w=600&auto=format&fit=crop',
+    sampleUrl: '/samples/inverter.svg',
   },
   structure: {
     title: 'Mounting Structure & Base',
     hint: 'Anchor fasteners, civil pedestals and galvanized structure joints.',
-    sampleUrl: 'https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?w=600&auto=format&fit=crop',
+    sampleUrl: '/samples/structure.svg',
   },
   earthing: {
     title: 'Dual Earthing & Lightning Strip',
     hint: 'Visible earthing pit chamber, earth bus bar and green insulated copper cable.',
-    sampleUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600&auto=format&fit=crop',
+    sampleUrl: '/samples/earthing.svg',
   },
 };
 
@@ -192,7 +192,7 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
       {/* Step Progress Header */}
       <div className="bg-white border-b border-slate-200 px-4 py-2.5 shadow-sm">
         <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-1.5">
-          <span className="text-brand-600 font-bold uppercase tracking-wider">
+          <span className="text-brand-600 font-bold">
             Step {activeStep} of 7: {stepTitles[activeStep - 1]}
           </span>
           <span className="text-slate-400 font-mono">
@@ -355,11 +355,11 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
                       <div>
                         <div className="text-xs font-bold text-slate-800">Panel {idx + 1} of 4</div>
                         {isScanned ? (
-                          <div className="text-xs font-mono font-bold text-emerald-800 tracking-wide">
+                          <div className="text-xs font-mono font-bold text-emerald-800">
                             {serial}
                           </div>
                         ) : (
-                          <div className="text-[11px] text-slate-400">Tap scan to capture barcode</div>
+                          <div className="text-xs text-slate-400">Tap scan to capture barcode</div>
                         )}
                       </div>
                     </div>
@@ -425,7 +425,7 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
                         {draft.inverterSerial}
                       </div>
                     ) : (
-                      <div className="text-[11px] text-slate-400">Requires 1 valid serial</div>
+                      <div className="text-xs text-slate-400">Requires 1 valid serial</div>
                     )}
                   </div>
                 </div>
@@ -448,7 +448,7 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
               </div>
 
               {draft.inverterSerial && (
-                <div className="text-[11px] text-emerald-700 bg-emerald-100/50 p-2 rounded border border-emerald-200">
+                <div className="text-xs text-emerald-700 bg-emerald-100/50 p-2 rounded border border-emerald-200">
                   ✓ Validated against warehouse batch stock (Havells / Sungrow Approved Series).
                 </div>
               )}
@@ -489,23 +489,23 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
                         <div className="w-12 h-12 rounded-lg overflow-hidden border border-emerald-400 relative flex-shrink-0">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={photo.url} alt={guide.title} className="w-full h-full object-cover" />
-                          <span className="absolute bottom-0 right-0 bg-emerald-600 text-white text-[9px] px-1 font-bold">
+                          <span className="absolute bottom-0 right-0 bg-emerald-600 text-white text-xs px-1 font-bold">
                             ✓
                           </span>
                         </div>
                       ) : (
                         <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 flex flex-col items-center justify-center text-slate-400 flex-shrink-0">
                           <Camera className="w-5 h-5" />
-                          <span className="text-[9px] font-bold">#{idx + 1}</span>
+                          <span className="text-xs font-bold">#{idx + 1}</span>
                         </div>
                       )}
                       <div>
                         <div className="text-xs font-bold text-slate-900">
                           {idx + 1}. {guide.title}
                         </div>
-                        <div className="text-[11px] text-slate-500 line-clamp-1">{guide.hint}</div>
+                        <div className="text-xs text-slate-500 line-clamp-1">{guide.hint}</div>
                         {isCaptured && (
-                          <div className="text-[10px] text-emerald-700 font-medium mt-0.5">
+                          <div className="text-xs text-emerald-700 font-medium mt-0.5">
                             Captured at {photo.capturedAt} • High Resolution
                           </div>
                         )}
@@ -555,7 +555,7 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
                     <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
                     <div>
                       <div className="font-bold">GPS Coordinates Locked</div>
-                      <div className="text-[11px] text-emerald-600">
+                      <div className="text-xs text-emerald-600">
                         Accuracy: {draft.gps.accuracy} meters (Threshold &lt; 15m)
                       </div>
                     </div>
@@ -592,7 +592,7 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
               ) : (
                 <div className="text-center py-6 space-y-3">
                   <div className="w-12 h-12 bg-brand-50 text-brand-600 rounded-full flex items-center justify-center mx-auto">
-                    <MapPin className="w-6 h-6 animate-bounce" />
+                    <MapPin className="w-6 h-6" />
                   </div>
                   <div>
                     <div className="text-sm font-bold text-slate-900">Satellite Geotag Required</div>
@@ -743,7 +743,7 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
               <h4 className="text-sm font-bold">
                 Scan {scanModal.type === 'panel' ? `Panel #${(scanModal.index || 0) + 1}` : 'Inverter'}
               </h4>
-              <p className="text-[11px] text-slate-300">Align barcode inside the viewfinder</p>
+              <p className="text-xs text-slate-300">Align barcode inside the viewfinder</p>
             </div>
             <button
               onClick={closeScanModal}
@@ -762,8 +762,8 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
               <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-brand-400" />
               <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-brand-400" />
               {/* Animated laser line */}
-              <div className="w-full h-0.5 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,1)] animate-pulse" />
-              <div className="text-[11px] text-white/70 absolute bottom-2">Target Barcode</div>
+              <div className="w-full h-0.5 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,1)]" />
+              <div className="text-xs text-white/70 absolute bottom-2">Target Barcode</div>
             </div>
 
             {/* Scan Feedback Alert */}
@@ -779,7 +779,7 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
 
             {/* Quick test barcodes for 1-tap evaluation */}
             <div className="mt-4 w-full">
-              <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-1.5 text-center">
+              <div className="text-xs text-slate-400 font-bold mb-1.5 text-center">
                 Simulate Camera Scan (Tap an available serial):
               </div>
               <div className="flex flex-wrap gap-1.5 justify-center">
@@ -787,25 +787,25 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
                   <>
                     <button
                       onClick={() => handleExecuteScan('SP-540W-260301')}
-                      className="text-[11px] bg-slate-800 hover:bg-brand-600 px-2.5 py-1 rounded border border-slate-700 font-mono"
+                      className="text-xs bg-slate-800 hover:bg-brand-600 px-2.5 py-1 rounded border border-slate-700 font-mono"
                     >
                       SP-540W-260301 (Tata)
                     </button>
                     <button
                       onClick={() => handleExecuteScan('SP-540W-260302')}
-                      className="text-[11px] bg-slate-800 hover:bg-brand-600 px-2.5 py-1 rounded border border-slate-700 font-mono"
+                      className="text-xs bg-slate-800 hover:bg-brand-600 px-2.5 py-1 rounded border border-slate-700 font-mono"
                     >
                       SP-540W-260302 (Tata)
                     </button>
                     <button
                       onClick={() => handleExecuteScan('SP-540W-260305')}
-                      className="text-[11px] bg-slate-800 hover:bg-brand-600 px-2.5 py-1 rounded border border-slate-700 font-mono"
+                      className="text-xs bg-slate-800 hover:bg-brand-600 px-2.5 py-1 rounded border border-slate-700 font-mono"
                     >
                       SP-540W-260305 (Adani)
                     </button>
                     <button
                       onClick={() => handleExecuteScan('SP-540W-260101')}
-                      className="text-[11px] bg-red-950 text-red-300 hover:bg-red-900 px-2.5 py-1 rounded border border-red-800 font-mono"
+                      className="text-xs bg-red-950 text-red-300 hover:bg-red-900 px-2.5 py-1 rounded border border-red-800 font-mono"
                       title="Test duplicate rejection"
                     >
                       SP-540W-260101 (Test Duplicate!)
@@ -815,19 +815,19 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
                   <>
                     <button
                       onClick={() => handleExecuteScan('INV-3.3KW-9003')}
-                      className="text-[11px] bg-slate-800 hover:bg-brand-600 px-2.5 py-1 rounded border border-slate-700 font-mono"
+                      className="text-xs bg-slate-800 hover:bg-brand-600 px-2.5 py-1 rounded border border-slate-700 font-mono"
                     >
                       INV-3.3KW-9003 (Havells)
                     </button>
                     <button
                       onClick={() => handleExecuteScan('INV-3.3KW-9004')}
-                      className="text-[11px] bg-slate-800 hover:bg-brand-600 px-2.5 py-1 rounded border border-slate-700 font-mono"
+                      className="text-xs bg-slate-800 hover:bg-brand-600 px-2.5 py-1 rounded border border-slate-700 font-mono"
                     >
                       INV-3.3KW-9004 (Sungrow)
                     </button>
                     <button
                       onClick={() => handleExecuteScan('INV-3.3KW-9001')}
-                      className="text-[11px] bg-red-950 text-red-300 hover:bg-red-900 px-2.5 py-1 rounded border border-red-800 font-mono"
+                      className="text-xs bg-red-950 text-red-300 hover:bg-red-900 px-2.5 py-1 rounded border border-red-800 font-mono"
                       title="Test duplicate rejection"
                     >
                       INV-3.3KW-9001 (Test Duplicate!)
@@ -841,14 +841,14 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
             <div className="mt-4 pt-3 border-t border-slate-800 w-full text-center">
               <button
                 onClick={() => setShowManualFallback(!showManualFallback)}
-                className="text-[11px] text-slate-400 hover:text-slate-200 underline"
+                className="text-xs text-slate-400 hover:text-slate-200 underline"
               >
                 {showManualFallback ? 'Hide typing box' : "Can't scan? Type the number instead"}
               </button>
 
               {showManualFallback && (
                 <div className="mt-3 space-y-2 bg-slate-800/80 p-3 rounded-lg text-left">
-                  <div className="text-[11px] text-amber-300">
+                  <div className="text-xs text-amber-300">
                     ⚠ Typed numbers are recorded and checked by the office.
                   </div>
                   <input
@@ -884,7 +884,7 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
           <div className="flex justify-between items-center mb-3">
             <div>
               <h4 className="text-sm font-bold">{PHOTO_GUIDES[activePhotoCategory].title}</h4>
-              <p className="text-[11px] text-slate-300">{PHOTO_GUIDES[activePhotoCategory].hint}</p>
+              <p className="text-xs text-slate-300">{PHOTO_GUIDES[activePhotoCategory].hint}</p>
             </div>
             <button
               onClick={() => setActivePhotoCategory(null)}
@@ -898,7 +898,7 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
             {/* Guide sample overlay thumbnail */}
             <div className="flex justify-between items-start">
               <div className="bg-black/60 backdrop-blur-sm p-2 rounded-lg border border-white/10 max-w-[200px]">
-                <div className="text-[10px] text-brand-300 font-bold uppercase mb-1">Guide Reference:</div>
+                <div className="text-xs text-brand-300 font-bold mb-1">Guide Reference:</div>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={PHOTO_GUIDES[activePhotoCategory].sampleUrl}
@@ -906,7 +906,7 @@ export const GuidedInstallationWizard: React.FC<{ onComplete: () => void; onCanc
                   className="w-full h-24 object-cover rounded"
                 />
               </div>
-              <div className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-1 rounded">
+              <div className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-1 rounded">
                 Lighting: Optimal
               </div>
             </div>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400"><rect x="0" y="0" width="600" height="400" fill="#bfdbfe"/><circle cx="500" cy="80" r="40" fill="#fbbf24"/>
+   <polygon points="60,260 300,140 540,260" fill="#94a3b8"/><rect x="90" y="260" width="420" height="120" fill="#e2e8f0"/>
+   <g fill="#1e3a8a" stroke="#fff" stroke-width="4"><polygon points="150,236 230,196 300,224 220,266"/><polygon points="240,192 320,152 390,180 310,220"/><polygon points="310,226 390,186 460,214 380,256"/><polygon points="220,270 300,230 370,258 290,300" transform="translate(-0,0)"/></g>
+  <rect x="0" y="352" width="600" height="48" fill="rgba(15,23,42,0.72)"/>
+  <text x="20" y="384" font-size="24" fill="#fff" font-family="Arial, sans-serif" font-weight="bold">Sample photo · Front view of the panels</text></svg>

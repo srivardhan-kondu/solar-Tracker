@@ -252,13 +252,13 @@ export const SEED_INSTALLATIONS: Installation[] = [
     panels: ['SP-540W-260101', 'SP-540W-260102', 'SP-540W-260103', 'SP-540W-260104'],
     inverterSerial: 'INV-3.3KW-9001',
     photos: {
-      front: { id: 'ph_1', category: 'front', name: 'Rooftop Array Front View', url: 'https://images.unsplash.com/photo-1509391365360-2e959784a276?w=600&auto=format&fit=crop', capturedAt: '2026-11-20 10:45 AM', status: 'uploaded' },
-      side: { id: 'ph_2', category: 'side', name: 'Array Side & Tilt Angle', url: 'https://images.unsplash.com/photo-1508873696983-2df5293cb32b?w=600&auto=format&fit=crop', capturedAt: '2026-11-20 10:48 AM', status: 'uploaded' },
-      consumer: { id: 'ph_3', category: 'consumer', name: 'Beneficiary with ID & Rooftop', url: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&auto=format&fit=crop', capturedAt: '2026-11-20 10:50 AM', status: 'uploaded' },
-      meter: { id: 'ph_4', category: 'meter', name: 'Bi-directional Net Meter', url: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=600&auto=format&fit=crop', capturedAt: '2026-11-20 10:55 AM', status: 'uploaded' },
-      inverter: { id: 'ph_5', category: 'inverter', name: 'Inverter Wall Mount & Display', url: 'https://images.unsplash.com/photo-1558441719-8b489c63f732?w=600&auto=format&fit=crop', capturedAt: '2026-11-20 11:00 AM', status: 'uploaded' },
-      structure: { id: 'ph_6', category: 'structure', name: 'Mounting Structure & Fasteners', url: 'https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?w=600&auto=format&fit=crop', capturedAt: '2026-11-20 11:05 AM', status: 'uploaded' },
-      earthing: { id: 'ph_7', category: 'earthing', name: 'Dual Earthing Pit & Strip', url: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600&auto=format&fit=crop', capturedAt: '2026-11-20 11:10 AM', status: 'uploaded' },
+      front: { id: 'ph_1', category: 'front', name: 'Rooftop Array Front View', url: '/samples/front.svg', capturedAt: '2026-11-20 10:45 AM', status: 'uploaded' },
+      side: { id: 'ph_2', category: 'side', name: 'Array Side & Tilt Angle', url: '/samples/side.svg', capturedAt: '2026-11-20 10:48 AM', status: 'uploaded' },
+      consumer: { id: 'ph_3', category: 'consumer', name: 'Beneficiary with ID & Rooftop', url: '/samples/consumer.svg', capturedAt: '2026-11-20 10:50 AM', status: 'uploaded' },
+      meter: { id: 'ph_4', category: 'meter', name: 'Bi-directional Net Meter', url: '/samples/meter.svg', capturedAt: '2026-11-20 10:55 AM', status: 'uploaded' },
+      inverter: { id: 'ph_5', category: 'inverter', name: 'Inverter Wall Mount & Display', url: '/samples/inverter.svg', capturedAt: '2026-11-20 11:00 AM', status: 'uploaded' },
+      structure: { id: 'ph_6', category: 'structure', name: 'Mounting Structure & Fasteners', url: '/samples/structure.svg', capturedAt: '2026-11-20 11:05 AM', status: 'uploaded' },
+      earthing: { id: 'ph_7', category: 'earthing', name: 'Dual Earthing Pit & Strip', url: '/samples/earthing.svg', capturedAt: '2026-11-20 11:10 AM', status: 'uploaded' },
     },
     gps: {
       latitude: 16.3421,
@@ -289,12 +289,12 @@ export const SEED_INSTALLATIONS: Installation[] = [
     panels: ['SP-540W-260201', 'SP-540W-260202', 'SP-540W-260203', 'SP-540W-260204'],
     inverterSerial: 'INV-3.3KW-9002',
     photos: {
-      front: { id: 'ph_21', category: 'front', name: 'Rooftop Array Front View', url: 'https://images.unsplash.com/photo-1509391365360-2e959784a276?w=600&auto=format&fit=crop', capturedAt: '2026-11-21 02:40 PM', status: 'uploaded' },
-      side: { id: 'ph_22', category: 'side', name: 'Array Side & Tilt Angle', url: 'https://images.unsplash.com/photo-1508873696983-2df5293cb32b?w=600&auto=format&fit=crop', capturedAt: '2026-11-21 02:45 PM', status: 'uploaded' },
-      consumer: { id: 'ph_23', category: 'consumer', name: 'Beneficiary with ID', url: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&auto=format&fit=crop', capturedAt: '2026-11-21 02:50 PM', status: 'uploaded' },
-      inverter: { id: 'ph_24', category: 'inverter', name: 'Inverter Display', url: 'https://images.unsplash.com/photo-1558441719-8b489c63f732?w=600&auto=format&fit=crop', capturedAt: '2026-11-21 03:00 PM', status: 'uploaded' },
-      structure: { id: 'ph_25', category: 'structure', name: 'Mounting Structure', url: 'https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?w=600&auto=format&fit=crop', capturedAt: '2026-11-21 03:05 PM', status: 'uploaded' },
-      earthing: { id: 'ph_26', category: 'earthing', name: 'Earthing Pit', url: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600&auto=format&fit=crop', capturedAt: '2026-11-21 03:10 PM', status: 'uploaded' },
+      front: { id: 'ph_21', category: 'front', name: 'Rooftop Array Front View', url: '/samples/front.svg', capturedAt: '2026-11-21 02:40 PM', status: 'uploaded' },
+      side: { id: 'ph_22', category: 'side', name: 'Array Side & Tilt Angle', url: '/samples/side.svg', capturedAt: '2026-11-21 02:45 PM', status: 'uploaded' },
+      consumer: { id: 'ph_23', category: 'consumer', name: 'Beneficiary with ID', url: '/samples/consumer.svg', capturedAt: '2026-11-21 02:50 PM', status: 'uploaded' },
+      inverter: { id: 'ph_24', category: 'inverter', name: 'Inverter Display', url: '/samples/inverter.svg', capturedAt: '2026-11-21 03:00 PM', status: 'uploaded' },
+      structure: { id: 'ph_25', category: 'structure', name: 'Mounting Structure', url: '/samples/structure.svg', capturedAt: '2026-11-21 03:05 PM', status: 'uploaded' },
+      earthing: { id: 'ph_26', category: 'earthing', name: 'Earthing Pit', url: '/samples/earthing.svg', capturedAt: '2026-11-21 03:10 PM', status: 'uploaded' },
       // Meter photo deliberately missing to showcase Action Required / Exception!
     },
     gps: {
@@ -385,7 +385,7 @@ export const SEED_SERVICE_TICKETS: ServiceTicket[] = [
     dueDate: '2026-11-22',
     closedAt: '2026-11-21 04:30 PM',
     visitNotes: 'Inspected site, re-tightened terminal lug, tested pit resistance at 2.4 ohms. Pit cover replaced.',
-    visitPhotos: ['https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600&auto=format&fit=crop'],
+    visitPhotos: ['/samples/earthing.svg'],
     closureReason: 'Terminal re-bonded and test certificate issued to consumer.',
   },
 ];

@@ -24,7 +24,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentTab, se
         }`}
       >
         <Home className="w-5 h-5" />
-        <span className="text-[11px] mt-0.5">Home</span>
+        <span className="text-xs mt-0.5">Home</span>
       </button>
 
       {!isServiceRole && (
@@ -35,7 +35,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentTab, se
           }`}
         >
           <ClipboardList className="w-5 h-5" />
-          <span className="text-[11px] mt-0.5">My Work</span>
+          <span className="text-xs mt-0.5">My Work</span>
         </button>
       )}
 
@@ -47,7 +47,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentTab, se
           }`}
         >
           <Wrench className="w-5 h-5" />
-          <span className="text-[11px] mt-0.5">Tickets</span>
+          <span className="text-xs mt-0.5">Tickets</span>
         </button>
       )}
 
@@ -59,11 +59,11 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentTab, se
       >
         <RefreshCw className="w-5 h-5" />
         {pendingSyncCount > 0 && (
-          <span className="absolute -top-0.5 right-2 bg-amber-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+          <span className="absolute -top-0.5 right-2 bg-amber-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">
             {pendingSyncCount}
           </span>
         )}
-        <span className="text-[11px] mt-0.5">Sync & Help</span>
+        <span className="text-xs mt-0.5">Sync & Help</span>
       </button>
     </div>
   );
