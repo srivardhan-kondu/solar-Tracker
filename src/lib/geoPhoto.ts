@@ -36,6 +36,56 @@ const stampTime = (d: Date) =>
   });
 
 /**
+ * The location stamp: a dark band across the bottom with large white text.
+ * One text size is chosen so the longest line fills the full width; every line is then
+ * spread from the left edge to the right edge. The band is kept to at most 40% of the photo.
+ */
+const drawStamp = (ctx: CanvasRenderingContext2D, w: number, h: number, lines: string[][]) => {
+  const FONT = (size: number, bold: boolean) => `${bold ? 'bold ' : ''}${size}px Arial, Helvetica, sans-serif`;
+  const LINE_HEIGHT = 1.22;
+  const MAX_BAND_SHARE = 0.4;
+  const pad = Math.max(8, Math.round(w * 0.025));
+  const usable = w - pad * 2;
+
+  // Natural width of each line at 100px, with at least one "em" between its parts
+  const naturalWidth = (parts: string[], bold: boolean) => {
+    ctx.font = FONT(100, bold);
+    return parts.reduce((sum, part) => sum + ctx.measureText(part).width, 0) + (parts.length - 1) * 100;
+  };
+  const widest = Math.max(...lines.map((parts, i) => naturalWidth(parts, i === 0)));
+  let font = Math.floor((usable / widest) * 100);
+  // Not taller than the allowed band
+  const maxByHeight = Math.floor((h * MAX_BAND_SHARE - pad * 2) / (lines.length * LINE_HEIGHT));
+  font = Math.max(12, Math.min(font, maxByHeight));
+
+  const lineH = Math.round(font * LINE_HEIGHT);
+  const band = lines.length * lineH + pad * 2;
+  const top = h - band;
+  ctx.fillStyle = 'rgba(0,0,0,0.65)';
+  ctx.fillRect(0, top, w, band);
+  ctx.fillStyle = '#ffffff';
+  ctx.textBaseline = 'middle';
+
+  lines.forEach((parts, i) => {
+    ctx.font = FONT(font, i === 0);
+    const y = top + pad + i * lineH + lineH / 2;
+    const widths = parts.map((part) => ctx.measureText(part).width);
+    const total = widths.reduce((a, b) => a + b, 0);
+    if (parts.length === 1 || total >= usable) {
+      // One part, or too long to spread: start at the left, squeezed to fit if needed
+      ctx.fillText(parts.join('  '), pad, y, usable);
+      return;
+    }
+    const gap = (usable - total) / (parts.length - 1);
+    let x = pad;
+    parts.forEach((part, j) => {
+      ctx.fillText(part, x, y);
+      x += widths[j] + gap;
+    });
+  });
+};
+
+/**
  * Take the current camera frame, shrink it, and print the location stamp on it.
  * The stamp is part of the picture, so it stays with the photo wherever it goes.
  */
@@ -59,22 +109,14 @@ export const captureStampedFrame = (
   ctx.drawImage(video, 0, 0, w, h);
 
   const now = new Date(takenAt);
-  const lines = [
-    label,
-    `Lat ${geo.latitude.toFixed(6)}  Long ${geo.longitude.toFixed(6)}  ±${Math.round(geo.accuracy)} m`,
-    `${stampTime(now)} IST${clockChecked ? '' : '  (phone clock, offline)'}`,
+  const [consumer, ...rest] = label.split(' · ');
+  // Each line is a few parts spread from the left edge to the right edge
+  const lines: string[][] = [
+    [`Lat ${geo.latitude.toFixed(6)}`, `Long ${geo.longitude.toFixed(6)}`],
+    [`±${Math.round(geo.accuracy)} m`, `${stampTime(now)} IST`, ...(clockChecked ? [] : ['(phone clock, offline)'])],
+    rest.length ? [consumer, rest.join(' · ')] : [consumer],
   ];
-  const font = Math.max(14, Math.round(w / 38));
-  const pad = Math.round(font * 0.6);
-  const band = lines.length * font * 1.3 + pad * 2;
-  ctx.fillStyle = 'rgba(0,0,0,0.6)';
-  ctx.fillRect(0, h - band, w, band);
-  ctx.fillStyle = '#ffffff';
-  ctx.textBaseline = 'top';
-  lines.forEach((line, i) => {
-    ctx.font = `${i === 0 ? 'bold ' : ''}${font}px Arial, sans-serif`;
-    ctx.fillText(line, pad, h - band + pad + i * font * 1.3, w - pad * 2);
-  });
+  drawStamp(ctx, w, h, lines);
 
   return {
     url: canvas.toDataURL('image/jpeg', quality),
