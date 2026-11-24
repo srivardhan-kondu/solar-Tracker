@@ -24,7 +24,18 @@ export const ActionRequiredView: React.FC<{
   const [filterType, setFilterType] = useState('All');
   const [filterStatus, setFilterStatus] = useState('Open');
   const [selectedException, setSelectedException] = useState<ActionRequiredException | null>(null);
+  const [mode, setMode] = useState<'resolve' | 'dismiss'>('resolve');
   const [resolutionNote, setResolutionNote] = useState('');
+
+  const TYPE_LABEL: Record<string, string> = {
+    missing_photo: 'Missing photos',
+    gps_issue: 'Location problem',
+    duplicate_serial: 'Serial already used',
+    inventory_conflict: 'Stock problem',
+    dcr_mismatch: 'DCR not matched',
+    sync_failure: 'Sending failed',
+    service_overdue: 'Service overdue',
+  };
 
   const filteredExceptions = exceptions.filter((e) => {
     const matchType = filterType === 'All' || e.type === filterType;
@@ -34,7 +45,8 @@ export const ActionRequiredView: React.FC<{
 
   const handleResolve = () => {
     if (!selectedException || !resolutionNote.trim()) return;
-    resolveException(selectedException.id, resolutionNote);
+    if (mode === 'resolve') resolveException(selectedException.id, resolutionNote.trim());
+    else dismissException(selectedException.id, resolutionNote.trim());
     setSelectedException(null);
     setResolutionNote('');
   };
@@ -44,11 +56,10 @@ export const ActionRequiredView: React.FC<{
       {/* Header */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            Action Required / Exception Management Centre
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Centralized queue for missing evidence, low GPS accuracy, serial collisions, and unmapped DCR rows.
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Problems to Fix</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Things that need someone in the office to look at them: missing photos, location problems, reused serial
+            numbers and unmatched DCR rows.
           </p>
         </div>
 
@@ -56,23 +67,27 @@ export const ActionRequiredView: React.FC<{
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            className="text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700"
+            aria-label="Filter by problem type"
+            className="text-sm font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700"
           >
-            <option value="All">All Exception Types</option>
-            <option value="missing_photo">Missing Mandatory Photos</option>
-            <option value="gps_issue">GPS Accuracy Warnings</option>
-            <option value="duplicate_serial">Duplicate Serial Attempts</option>
-            <option value="dcr_mismatch">DCR ULA Mismatches</option>
+            <option value="All">All problem types</option>
+            {Object.entries(TYPE_LABEL).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
           </select>
 
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700"
+            aria-label="Filter by status"
+            className="text-sm font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700"
           >
-            <option value="Open">Open Exceptions</option>
-            <option value="Resolved">Resolved</option>
-            <option value="All">All Statuses</option>
+            <option value="Open">Still open</option>
+            <option value="Resolved">Fixed</option>
+            <option value="Dismissed">Dismissed</option>
+            <option value="All">All</option>
           </select>
         </div>
       </div>
@@ -101,7 +116,7 @@ export const ActionRequiredView: React.FC<{
                     >
                       {exc.priority} Priority
                     </span>
-                    <span className="text-xs font-mono text-slate-500 font-semibold">{exc.id}</span>
+                    <span className="text-xs text-slate-500 font-semibold">{TYPE_LABEL[exc.type] || exc.type}</span>
                   </div>
                   <span
                     className={`text-xs font-bold px-2 py-0.5 rounded-full ${
@@ -121,9 +136,18 @@ export const ActionRequiredView: React.FC<{
 
                 <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500">
                   <div>
-                    {exc.consumerNumber && (
-                      <span className="font-mono font-bold text-brand-700 mr-2">{exc.consumerNumber}</span>
-                    )}
+                    {exc.consumerNumber &&
+                      (onSelectConsumerNumber ? (
+                        <button
+                          onClick={() => onSelectConsumerNumber(exc.consumerNumber!)}
+                          className="font-mono font-bold text-brand-700 underline mr-2"
+                          title="Open this consumer"
+                        >
+                          {exc.consumerNumber}
+                        </button>
+                      ) : (
+                        <span className="font-mono font-bold text-brand-700 mr-2">{exc.consumerNumber}</span>
+                      ))}
                     <span>{exc.division}</span>
                   </div>
                   <span>{exc.detectedDate}</span>
@@ -131,10 +155,12 @@ export const ActionRequiredView: React.FC<{
 
                 {exc.resolutionNote && (
                   <div className="p-2.5 bg-emerald-50 rounded-xl text-xs text-emerald-900 border border-emerald-200">
-                    <span className="font-bold">Resolution Note:</span> {exc.resolutionNote}
-                    <div className="text-[10px] text-emerald-700 mt-0.5">
-                      Resolved by {exc.resolvedBy} on {exc.resolvedAt}
-                    </div>
+                    <span className="font-bold">Note:</span> {exc.resolutionNote}
+                    {exc.resolvedBy && (
+                      <div className="text-xs text-emerald-700 mt-0.5">
+                        Fixed by {exc.resolvedBy} on {exc.resolvedAt}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -143,20 +169,22 @@ export const ActionRequiredView: React.FC<{
                     <button
                       onClick={() => {
                         setSelectedException(exc);
+                        setMode('resolve');
                         setResolutionNote('');
                       }}
-                      className="flex-1 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+                      className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-bold transition-colors shadow-sm"
                     >
-                      Resolve Exception
+                      Mark as fixed
                     </button>
                     <button
                       onClick={() => {
-                        const reason = prompt('Enter dismissal reason:');
-                        if (reason) dismissException(exc.id, reason);
+                        setSelectedException(exc);
+                        setMode('dismiss');
+                        setResolutionNote('');
                       }}
-                      className="px-3 py-1.5 border border-slate-300 hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold"
+                      className="px-4 py-2.5 border border-slate-300 hover:bg-slate-50 text-slate-600 rounded-lg text-sm font-semibold"
                     >
-                      Dismiss
+                      Not a problem
                     </button>
                   </div>
                 )}
@@ -165,7 +193,7 @@ export const ActionRequiredView: React.FC<{
           })
         ) : (
           <div className="col-span-2 py-12 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
-            No exceptions found in this filter.
+            {filterStatus === 'Open' && filterType === 'All' ? 'Nothing to fix right now. 🎉' : 'Nothing matches these filters.'}
           </div>
         )}
       </div>
@@ -174,18 +202,21 @@ export const ActionRequiredView: React.FC<{
       {selectedException && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200">
-            <h3 className="text-base font-bold text-slate-900">Resolve Exception: {selectedException.title}</h3>
+            <h3 className="text-base font-bold text-slate-900">
+              {mode === 'resolve' ? 'Mark as fixed' : 'Not a problem'}: {selectedException.title}
+            </h3>
             <p className="text-xs text-slate-600 leading-relaxed">{selectedException.description}</p>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Resolution Note & Corrective Action (Required)
+              <label className="block text-sm font-bold text-slate-700 mb-1">
+                {mode === 'resolve' ? 'What did you do to fix it?' : 'Why is this not a problem?'} (required)
               </label>
               <textarea
                 value={resolutionNote}
                 onChange={(e) => setResolutionNote(e.target.value)}
                 placeholder="e.g. Supervisor physically validated site coordinates on ground and approved exception..."
-                className="w-full p-2.5 border border-slate-300 rounded-xl text-xs h-24 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                autoFocus
+                className="w-full p-2.5 border border-slate-300 rounded-xl text-sm h-24 focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
 
@@ -198,9 +229,10 @@ export const ActionRequiredView: React.FC<{
               </button>
               <button
                 onClick={handleResolve}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md"
+                disabled={!resolutionNote.trim()}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed"
               >
-                Confirm Resolution
+                Save
               </button>
             </div>
           </div>
