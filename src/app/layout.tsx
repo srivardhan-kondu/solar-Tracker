@@ -1,10 +1,25 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { Atkinson_Hyperlegible } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from "@/context/AppContext";
 
+// Atkinson Hyperlegible: designed by the Braille Institute for readers with low vision.
+const appFont = Atkinson_Hyperlegible({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  display: "swap",
+  variable: "--font-sans",
+});
+
 export const metadata: Metadata = {
-  title: "SolarTrack Enterprise | Solar Operations Management System",
-  description: "Web-based Solar Operations, Installation Tracking, Inventory Locking and DCR Reconciliation Portal",
+  title: "Solar Tracker",
+  description: "Track rooftop solar installations, stock, DCR numbers and service complaints.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#1d4ed8",
 };
 
 export default function RootLayout({
@@ -13,8 +28,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className="antialiased min-h-screen bg-slate-50 text-slate-900">
+    <html lang="en" className={appFont.variable}>
+      <body className="font-sans antialiased min-h-screen bg-slate-50 text-slate-900">
         <AppProvider>{children}</AppProvider>
       </body>
     </html>

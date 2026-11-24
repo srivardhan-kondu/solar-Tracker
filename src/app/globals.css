@@ -2,16 +2,78 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 15, 23, 42;
-  --background-start-rgb: 248, 250, 252;
-  --background-end-rgb: 255, 255, 255;
+@layer base {
+  html {
+    font-size: 18px;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: #f4f6fa;
+    color: #111827;
+    line-height: 1.6;
+  }
+
+  /* Big, easy targets for older hands and touch screens */
+  button,
+  select,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  a[role="button"] {
+    min-height: 44px;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 1.35rem;
+    height: 1.35rem;
+    accent-color: #1d4ed8;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #6b7280;
+    opacity: 1;
+  }
+
+  /* A thick, obvious outline shows where the keyboard focus is */
+  :focus-visible {
+    outline: 3px solid #f59e0b;
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  /* Disabled buttons must look disabled, not just faded */
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: -0.01em;
+  }
+
+  /* Serial numbers: a little letter spacing makes long codes easier to read aloud */
+  .font-mono {
+    letter-spacing: 0.02em;
+  }
+
+  /* Never split a serial or consumer number across lines inside a table */
+  td.font-mono,
+  td .font-mono {
+    white-space: nowrap;
+  }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: #f8fafc;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+/* Respect people who turn off motion in their device settings */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 @media print {
