@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Search,
   Filter,
@@ -15,26 +15,46 @@ import {
 import { useApp } from '@/context/AppContext';
 import { Consumer } from '@/types';
 import * as XLSX from 'xlsx';
+import {
+  ALL_STATUSES,
+  STATUS_GROUPS,
+  STATUS_LABEL,
+  StatusGroupKey,
+  matchesStatusFilter,
+  statusBadgeClass,
+  uniqueSorted,
+} from '@/lib/status';
 
 export const ConsumerSearchView: React.FC<{
   onSelectConsumer: (consumer: Consumer) => void;
-  onNavigateToTab?: (tab: string) => void;
-}> = ({ onSelectConsumer }) => {
-  const { consumers, installations, dcrRecords } = useApp();
+  initialStatusFilter?: string;
+}> = ({ onSelectConsumer, initialStatusFilter = 'All' }) => {
+  const { consumers, installations } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
   const [divisionFilter, setDivisionFilter] = useState('All');
 
+  const divisions = uniqueSorted(consumers.map((c) => c.division));
+  // One lookup table instead of searching the installations list for every row
+  const installationByConsumer = useMemo(
+    () => new Map(installations.map((i) => [i.consumerNumber, i])),
+    [installations]
+  );
+
+  const q = searchQuery.trim().toLowerCase();
+  const qDigits = q.replace(/\D/g, '');
   const filteredConsumers = consumers.filter((c) => {
     const matchesSearch =
-      c.consumerNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.ula.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.village.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.mobile.includes(searchQuery);
+      !q ||
+      c.consumerNumber.toLowerCase().includes(q) ||
+      c.name.toLowerCase().includes(q) ||
+      c.ula.toLowerCase().includes(q) ||
+      c.village.toLowerCase().includes(q) ||
+      // Match mobile numbers regardless of spaces or +91
+      (qDigits.length >= 3 && c.mobile.replace(/\D/g, '').includes(qDigits));
 
-    const matchesStatus = statusFilter === 'All' || c.status === statusFilter;
+    const matchesStatus = matchesStatusFilter(c.status, statusFilter);
     const matchesDivision = divisionFilter === 'All' || c.division === divisionFilter;
 
     return matchesSearch && matchesStatus && matchesDivision;
@@ -42,7 +62,7 @@ export const ConsumerSearchView: React.FC<{
 
   const handleExportExcel = () => {
     const exportData = filteredConsumers.map((c) => {
-      const inst = installations.find((i) => i.consumerNumber === c.consumerNumber);
+      const inst = installationByConsumer.get(c.consumerNumber);
       return {
         'Consumer Number': c.consumerNumber,
         'Beneficiary Name': c.name,
@@ -76,9 +96,9 @@ export const ConsumerSearchView: React.FC<{
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Installation Records & Search</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Search across consumer master, serial numbers, ULA mappings, and photographic evidence.
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Find a Consumer</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Search by name, village, mobile or consumer number. Click &quot;Open&quot; to see photos and details.
           </p>
         </div>
 
@@ -87,7 +107,7 @@ export const ConsumerSearchView: React.FC<{
           className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-colors"
         >
           <Download className="w-4 h-4" />
-          <span>Export Excel</span>
+          <span>Download as Excel ({filteredConsumers.length})</span>
         </button>
       </div>
 
@@ -99,8 +119,9 @@ export const ConsumerSearchView: React.FC<{
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by Consumer No, Name, ULA, Village, Mobile..."
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white"
+            placeholder="Type a name, village, mobile or consumer number"
+            aria-label="Search consumers"
+            className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white"
           />
         </div>
 
@@ -108,24 +129,38 @@ export const ConsumerSearchView: React.FC<{
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700"
+            aria-label="Filter by status"
+            className="text-sm font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-700"
           >
-            <option value="All">All Statuses</option>
-            <option value="Assigned">Assigned</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Needs Review">Needs Review</option>
-            <option value="Completed">Completed</option>
+            <option value="All">All statuses</option>
+            <optgroup label="Groups">
+              {(Object.keys(STATUS_GROUPS) as StatusGroupKey[]).map((k) => (
+                <option key={k} value={`group:${k}`}>
+                  {STATUS_GROUPS[k].label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Exact status">
+              {ALL_STATUSES.map((st) => (
+                <option key={st} value={st}>
+                  {STATUS_LABEL[st]}
+                </option>
+              ))}
+            </optgroup>
           </select>
 
           <select
             value={divisionFilter}
             onChange={(e) => setDivisionFilter(e.target.value)}
-            className="text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700"
+            aria-label="Filter by division"
+            className="text-sm font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-700"
           >
-            <option value="All">All Divisions</option>
-            <option value="Guntur Central">Guntur Central</option>
-            <option value="Tenali Rural">Tenali Rural</option>
-            <option value="Palnadu West">Palnadu West</option>
+            <option value="All">All divisions</option>
+            {divisions.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -133,23 +168,23 @@ export const ConsumerSearchView: React.FC<{
       {/* Records Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
               <tr>
-                <th className="py-3 px-4">Consumer #</th>
-                <th className="py-3 px-4">Beneficiary Name</th>
+                <th className="py-3 px-4">Consumer No.</th>
+                <th className="py-3 px-4">Name</th>
                 <th className="py-3 px-4">Village / Division</th>
-                <th className="py-3 px-4">ULA Identifier</th>
+                <th className="py-3 px-4">ULA</th>
                 <th className="py-3 px-4">Installer</th>
-                <th className="py-3 px-4">DCR Status</th>
+                <th className="py-3 px-4">DCR No.</th>
                 <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+                <th className="py-3 px-4 text-right"><span className="sr-only">Open</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {filteredConsumers.length > 0 ? (
                 filteredConsumers.map((c) => {
-                  const inst = installations.find((i) => i.consumerNumber === c.consumerNumber);
+                  const inst = installationByConsumer.get(c.consumerNumber);
                   return (
                     <tr key={c.id} className="hover:bg-brand-50/50 transition-colors">
                       <td className="py-3.5 px-4 font-mono font-bold text-slate-900">{c.consumerNumber}</td>
@@ -177,27 +212,17 @@ export const ConsumerSearchView: React.FC<{
                         )}
                       </td>
                       <td className="py-3.5 px-4">
-                        <span
-                          className={`px-2.5 py-1 rounded-full font-bold text-[10px] ${
-                            c.status === 'Completed'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : c.status === 'Needs Review'
-                              ? 'bg-amber-100 text-amber-800'
-                              : c.status === 'In Progress'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-slate-100 text-slate-700'
-                          }`}
-                        >
-                          {c.status}
+                        <span className={`px-2.5 py-1 rounded-full font-bold text-xs whitespace-nowrap ${statusBadgeClass(c.status)}`}>
+                          {STATUS_LABEL[c.status]}
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <button
                           onClick={() => onSelectConsumer(c)}
-                          className="px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 rounded-lg font-bold text-xs inline-flex items-center gap-1.5 transition-colors border border-brand-200"
+                          className="px-4 py-2 bg-brand-50 hover:bg-brand-100 text-brand-700 rounded-lg font-bold text-sm inline-flex items-center gap-1.5 transition-colors border border-brand-200"
                         >
                           <Eye className="w-3.5 h-3.5" />
-                          <span>Consumer 360</span>
+                          <span>Open</span>
                         </button>
                       </td>
                     </tr>
@@ -205,8 +230,20 @@ export const ConsumerSearchView: React.FC<{
                 })
               ) : (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-xs text-slate-400">
-                    No matching consumer records found.
+                  <td colSpan={8} className="py-10 text-center text-sm text-slate-500">
+                    No consumers match.{' '}
+                    {(q || statusFilter !== 'All' || divisionFilter !== 'All') && (
+                      <button
+                        onClick={() => {
+                          setSearchQuery('');
+                          setStatusFilter('All');
+                          setDivisionFilter('All');
+                        }}
+                        className="font-bold text-brand-700 underline"
+                      >
+                        Clear search and filters
+                      </button>
+                    )}
                   </td>
                 </tr>
               )}
