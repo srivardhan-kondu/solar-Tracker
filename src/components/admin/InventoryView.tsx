@@ -14,7 +14,7 @@ import {
 import { useApp } from '@/context/AppContext';
 
 export const InventoryView: React.FC = () => {
-  const { inventory, consumers, scanPanel } = useApp();
+  const { inventory } = useApp();
 
   const [activeType, setActiveType] = useState<'all' | 'panel' | 'inverter'>('all');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -33,10 +33,23 @@ export const InventoryView: React.FC = () => {
     return matchType && matchStatus && matchSearch;
   });
 
-  const handleTestAtomicValidation = () => {
-    if (!testSerial.trim()) return;
-    const res = scanPanel(0, testSerial);
-    setTestResult({ success: res.success, message: res.message });
+  // Read-only lookup: this must never change stock or create problem records
+  const handleLookup = () => {
+    const sn = testSerial.trim().toUpperCase();
+    if (!sn) return;
+    const item = inventory.find((i) => i.serialNumber.toUpperCase() === sn);
+    if (!item) {
+      setTestResult({ success: false, message: `${sn} is not in the stock list.` });
+    } else if (item.status === 'Available') {
+      setTestResult({ success: true, message: `${sn} (${item.brand} ${item.type}) is in the store and free to use.` });
+    } else if (item.status === 'Installed') {
+      setTestResult({
+        success: false,
+        message: `${sn} is already fitted at consumer ${item.linkedConsumerNumber}${item.installedDate ? ` (on ${item.installedDate})` : ''}.`,
+      });
+    } else {
+      setTestResult({ success: false, message: `${sn} is marked "${item.status}" and cannot be used.` });
+    }
   };
 
   return (
@@ -44,15 +57,15 @@ export const InventoryView: React.FC = () => {
       {/* Header */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Equipment Inventory & Locking Hub</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Central serial ledger enforcing atomic equipment allocation and blocking duplicate assignment attempts.
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Panels & Inverters Stock</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Every panel and inverter, and which home it is fitted at. A serial number can only be used once.
           </p>
         </div>
 
         <div className="flex items-center gap-2 text-xs font-bold bg-emerald-50 text-emerald-800 px-3 py-1.5 rounded-xl border border-emerald-200">
           <Lock className="w-4 h-4 text-emerald-600" />
-          <span>Atomic Uniqueness Enforced</span>
+          <span>Each serial used only once</span>
         </div>
       </div>
 
@@ -60,29 +73,34 @@ export const InventoryView: React.FC = () => {
       <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-lg border border-slate-800 space-y-3">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-amber-400" />
-          <h3 className="text-sm font-bold">Interactive Atomic Locking & Duplicate Prevention Test</h3>
+          <h3 className="text-base font-bold">Look up a serial number</h3>
         </div>
-        <p className="text-xs text-slate-300">
-          Test any serial number to verify server-side duplicate prevention (e.g., test already-installed{' '}
-          <span className="font-mono text-amber-300 font-bold">SP-540W-260101</span> or available{' '}
-          <span className="font-mono text-emerald-300 font-bold">SP-540W-260301</span>).
+        <p className="text-sm text-slate-300">
+          Check whether a panel or inverter is free, already fitted, or damaged. This only looks; it changes nothing.
         </p>
 
-        <div className="flex gap-2 max-w-lg">
+        <form
+          className="flex gap-2 max-w-lg"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleLookup();
+          }}
+        >
           <input
             type="text"
             value={testSerial}
             onChange={(e) => setTestSerial(e.target.value.toUpperCase())}
-            placeholder="Enter serial number to test lock"
-            className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="e.g. SP-540W-260301"
+            aria-label="Serial number to look up"
+            className="flex-1 px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
           <button
-            onClick={handleTestAtomicValidation}
-            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-colors"
+            type="submit"
+            className="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-colors"
           >
-            Verify Uniqueness
+            Look up
           </button>
-        </div>
+        </form>
 
         {testResult && (
           <div
@@ -98,7 +116,7 @@ export const InventoryView: React.FC = () => {
               <ShieldAlert className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
             )}
             <div>
-              <div className="font-bold">{testResult.success ? 'Available for Allocation' : 'Duplicate Scan Rejection'}</div>
+              <div className="font-bold">{testResult.success ? 'Free to use' : 'Cannot be used'}</div>
               <div className="mt-0.5">{testResult.message}</div>
             </div>
           </div>
@@ -145,7 +163,10 @@ export const InventoryView: React.FC = () => {
               <option value="All">All Statuses</option>
               <option value="Available">Available</option>
               <option value="Installed">Installed</option>
+              <option value="Reserved">Reserved</option>
+              <option value="Returned">Returned</option>
               <option value="Damaged">Damaged</option>
+              <option value="Quarantined">Quarantined</option>
             </select>
           </div>
         </div>
@@ -163,6 +184,13 @@ export const InventoryView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
+              {filteredInventory.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center text-sm text-slate-500">
+                    Nothing matches your search.
+                  </td>
+                </tr>
+              )}
               {filteredInventory.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50">
                   <td className="py-3 px-4 font-mono font-bold text-slate-900">{item.serialNumber}</td>
@@ -178,7 +206,7 @@ export const InventoryView: React.FC = () => {
                         {item.linkedConsumerNumber}
                       </span>
                     ) : (
-                      <span className="text-slate-400 italic">Warehouse Stock</span>
+                      <span className="text-slate-400 italic">In store</span>
                     )}
                   </td>
                   <td className="py-3 px-4 text-right">
