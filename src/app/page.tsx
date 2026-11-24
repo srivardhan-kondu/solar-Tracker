@@ -50,12 +50,12 @@ export default function Home() {
       <AppNavbar onNavigateToTab={(tab) => navigate(tab)} />
 
       {/* Main Body */}
-      <div className="flex-1 flex max-w-7xl w-full mx-auto">
+      <div className="flex-1 flex max-w-[1480px] w-full mx-auto">
         {/* Left Sidebar */}
         <AppSidebar currentTab={currentTab} setCurrentTab={(tab) => navigate(tab)} />
 
         {/* Content Pane */}
-        <main className="flex-1 min-w-0 p-4 pb-28 sm:p-6 md:pb-6 overflow-y-auto">
+        <main className="flex-1 min-w-0 p-4 pb-32 sm:p-6 sm:pb-32 lg:pb-6 overflow-y-auto">
           {show('dashboard') && <DashboardView onNavigateToTab={navigate} />}
 
           {show('field_portal') && <FieldSubmissionWebView onFinished={() => navigate('installations')} />}

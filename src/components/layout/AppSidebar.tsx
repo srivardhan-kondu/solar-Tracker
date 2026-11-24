@@ -51,7 +51,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTa
       id: 'installations',
       label: 'Find a Consumer',
       icon: Users,
-      badge: pendingInstCount > 0 ? pendingInstCount : undefined,
+      badge: undefined,
     },
     {
       id: 'master_upload',
@@ -82,7 +82,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTa
       label: 'Problems to Fix',
       icon: AlertOctagon,
       badge: openExceptionsCount > 0 ? openExceptionsCount : undefined,
-      badgeColor: 'bg-red-500 text-white',
+      badgeColor: 'bg-red-600 text-white',
     },
     {
       id: 'reports',
@@ -112,40 +112,11 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTa
 
   return (
     <>
-    {/* Phones & small tablets: a scrollable strip instead of a fixed sidebar */}
-    <nav
-      aria-label="Main menu"
-      className="no-print md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 flex overflow-x-auto"
-    >
-      {menuItems.map((item) => {
-        const Icon = item.icon;
-        const isActive = currentTab === item.id;
-        return (
-          <button
-            key={item.id}
-            onClick={() => setCurrentTab(item.id)}
-            className={`relative flex-1 min-w-[84px] flex flex-col items-center gap-1 px-2 py-2.5 text-xs font-semibold ${
-              isActive ? 'text-brand-700 bg-brand-50' : 'text-slate-600'
-            }`}
-          >
-            <Icon className="w-5 h-5" />
-            <span className="text-center leading-tight">{item.label}</span>
-            {item.badge && (
-              <span className="absolute top-1 right-3 bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5">
-                {item.badge}
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </nav>
-
-    <aside className="no-print hidden md:flex w-60 flex-shrink-0 bg-white border-r border-slate-200 flex-col justify-between select-none">
-      <div className="p-4 space-y-1">
-        <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-          Menu
-        </div>
-
+      {/* Phones & small tablets: a bottom menu bar instead of a fixed sidebar */}
+      <nav
+        aria-label="Main menu"
+        className="no-print lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t-2 border-slate-200 flex overflow-x-auto"
+      >
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentTab === item.id;
@@ -153,39 +124,58 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTa
             <button
               key={item.id}
               onClick={() => setCurrentTab(item.id)}
-              className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold transition-all ${
-                isActive
-                  ? 'bg-brand-600 text-white shadow-sm shadow-brand-500/20'
-                  : item.highlight
-                  ? 'bg-brand-50 text-brand-700 hover:bg-brand-100 font-bold border border-brand-200'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              aria-current={isActive ? 'page' : undefined}
+              className={`relative flex-1 min-w-[96px] flex flex-col items-center gap-1 px-2 py-3 text-xs font-bold border-t-4 ${
+                isActive ? 'text-brand-700 bg-brand-50 border-brand-600' : 'text-slate-700 border-transparent'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : item.highlight ? 'text-brand-600' : 'text-slate-500'}`} />
-                <span>{item.label}</span>
-              </div>
-
+              <Icon className="w-7 h-7" />
+              <span className="text-center leading-tight">{item.label}</span>
               {item.badge && (
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    item.badgeColor ||
-                    (isActive
-                      ? 'bg-brand-700 text-white'
-                      : item.highlight
-                      ? 'bg-brand-600 text-white'
-                      : 'bg-slate-100 text-slate-700')
-                  }`}
-                >
+                <span className="absolute top-1.5 right-3 bg-red-600 text-white text-xs font-bold rounded-full min-w-[24px] h-6 px-1.5 flex items-center justify-center">
                   {item.badge}
                 </span>
               )}
             </button>
           );
         })}
-      </div>
+      </nav>
 
-    </aside>
+      <aside className="no-print hidden lg:flex w-72 flex-shrink-0 bg-white border-r-2 border-slate-200 flex-col select-none">
+        <div className="p-4 space-y-1.5 sticky top-[78px]">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = currentTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setCurrentTab(item.id)}
+                aria-current={isActive ? 'page' : undefined}
+                className={`w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-xl text-base font-bold transition-colors border-2 ${
+                  isActive
+                    ? 'bg-brand-600 text-white border-brand-600'
+                    : 'text-slate-800 border-transparent hover:bg-slate-100'
+                }`}
+              >
+                <span className="flex items-center gap-3 text-left">
+                  <Icon className={`w-6 h-6 flex-shrink-0 ${isActive ? 'text-white' : 'text-brand-600'}`} />
+                  <span>{item.label}</span>
+                </span>
+
+                {item.badge && (
+                  <span
+                    className={`text-sm font-bold min-w-[28px] h-7 px-2 rounded-full flex items-center justify-center ${
+                      isActive ? 'bg-white text-brand-700' : item.badgeColor || 'bg-slate-200 text-slate-800'
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </aside>
     </>
   );
 };

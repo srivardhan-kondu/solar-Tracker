@@ -1,223 +1,225 @@
 'use client';
 
-import React, { useState } from 'react';
-import {
-  Sun,
-  Search,
-  Bell,
-  ShieldCheck,
-  RotateCcw,
-  UserCheck,
-  Building2,
-  ChevronDown,
-  Sparkles,
-} from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Search, AlertTriangle, RotateCcw, ChevronDown, Check, X } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { isOfficeRole } from '@/lib/access';
+import { STATUS_LABEL } from '@/lib/status';
+import { Logo } from '@/components/brand/Logo';
 import { UserRole } from '@/types';
 
+/** Plain words for each role, shown to the person using the app */
+const ROLE_LABEL: Record<UserRole, string> = {
+  'Super Admin': 'Head office',
+  Admin: 'Office staff',
+  Installer: 'Installer',
+  'Service Engineer': 'Service engineer',
+};
+
 interface AppNavbarProps {
-  onSearchSelect?: (consumerNumber: string) => void;
   onNavigateToTab?: (tab: string) => void;
 }
 
-export const AppNavbar: React.FC<AppNavbarProps> = ({ onSearchSelect, onNavigateToTab }) => {
-  const {
-    currentUser,
-    setCurrentUser,
-    users,
-    exceptions,
-    consumers,
-    setSelectedConsumerFor360,
-    resetAllData,
-  } = useApp();
+export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
+  const { currentUser, setCurrentUser, users, exceptions, consumers, setSelectedConsumerFor360, resetAllData } =
+    useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [showRoleMenu, setShowRoleMenu] = useState(false);
+  const roleMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close the user menu when clicking elsewhere or pressing Esc
+  useEffect(() => {
+    if (!showRoleMenu) return;
+    const onDown = (e: MouseEvent) => {
+      if (roleMenuRef.current && !roleMenuRef.current.contains(e.target as Node)) setShowRoleMenu(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setShowRoleMenu(false);
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [showRoleMenu]);
 
   const openExceptionsCount = exceptions.filter((e) => e.status === 'Open').length;
+  const office = isOfficeRole(currentUser.role);
 
-  // Filter consumers for quick search
-  const filteredConsumers = searchQuery.trim()
+  const q = searchQuery.trim().toLowerCase();
+  const qDigits = q.replace(/\D/g, '');
+  const filteredConsumers = q
     ? consumers
         .filter(
           (c) =>
-            c.consumerNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.ula.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.mobile.includes(searchQuery) ||
-            c.village.toLowerCase().includes(searchQuery.toLowerCase())
+            c.consumerNumber.toLowerCase().includes(q) ||
+            c.name.toLowerCase().includes(q) ||
+            c.ula.toLowerCase().includes(q) ||
+            c.village.toLowerCase().includes(q) ||
+            (qDigits.length >= 3 && c.mobile.replace(/\D/g, '').includes(qDigits))
         )
-        .slice(0, 5)
+        .slice(0, 6)
     : [];
 
   return (
-    <header className="no-print bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-4">
-          {/* Logo & Brand */}
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-amber-500 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
-              <Sun className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-lg text-slate-900 tracking-tight">SolarTrack</span>
-                <span className="text-[10px] font-bold bg-brand-100 text-brand-800 px-2 py-0.5 rounded-full border border-brand-200 uppercase tracking-wider">
-                  Enterprise
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 font-medium hidden sm:block">
-                Operations, Installation & DCR Management
-              </p>
-            </div>
-          </div>
+    <header className="no-print bg-white border-b-2 border-slate-200 sticky top-0 z-40">
+      <div className="max-w-[1480px] mx-auto px-3 sm:px-6">
+        <div className="flex items-center justify-between min-h-[68px] sm:min-h-[76px] gap-2 sm:gap-4 py-2">
+          <Logo />
 
-          {/* Global Quick Search Bar */}
-          <div className="relative flex-1 max-w-md hidden md:block">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <Search className="w-4 h-4" />
-              </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setShowSearchResults(true);
-                }}
-                onFocus={() => setShowSearchResults(true)}
-                placeholder="Search name, village, mobile or consumer no."
-                aria-label="Search consumers"
-                onKeyDown={(e) => e.key === 'Escape' && setShowSearchResults(false)}
-                onBlur={() => setTimeout(() => setShowSearchResults(false), 150)}
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all"
-              />
-            </div>
+          {/* Search */}
+          <div className="relative flex-1 max-w-lg hidden md:block">
+            <Search className="w-5 h-5 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setShowSearchResults(true);
+              }}
+              onFocus={() => setShowSearchResults(true)}
+              onKeyDown={(e) => e.key === 'Escape' && setShowSearchResults(false)}
+              onBlur={() => setTimeout(() => setShowSearchResults(false), 150)}
+              placeholder="Find a consumer by name, village or phone"
+              aria-label="Find a consumer"
+              className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-slate-300 rounded-xl text-base text-slate-900 focus:outline-none focus:border-brand-600 focus:bg-white"
+            />
 
-            {/* Live Search Dropdown */}
-            {showSearchResults && searchQuery.trim() && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden divide-y divide-slate-100">
+            {showSearchResults && q && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white border-2 border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden divide-y divide-slate-100">
                 {filteredConsumers.length > 0 ? (
                   filteredConsumers.map((c) => (
                     <button
                       key={c.id}
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
                         setSelectedConsumerFor360(c);
                         setShowSearchResults(false);
                         setSearchQuery('');
                         onNavigateToTab?.('installations');
                       }}
-                      className="w-full text-left px-4 py-2.5 hover:bg-brand-50 flex items-center justify-between text-xs transition-colors"
+                      className="w-full text-left px-4 py-3 hover:bg-brand-50 flex items-center justify-between gap-3"
                     >
                       <div>
-                        <div className="font-bold text-slate-900">{c.name}</div>
-                        <div className="text-[11px] text-slate-500">
-                          {c.consumerNumber} • {c.village}, {c.district}
+                        <div className="text-base font-bold text-slate-900">{c.name}</div>
+                        <div className="text-sm text-slate-500">
+                          {c.village} · {c.consumerNumber}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
-                          {c.ula}
-                        </span>
-                        <div className="text-[10px] text-brand-600 font-semibold mt-0.5">{c.status}</div>
-                      </div>
+                      <span className="text-sm font-bold text-brand-700 whitespace-nowrap">{STATUS_LABEL[c.status]}</span>
                     </button>
                   ))
                 ) : (
-                  <div className="p-3 text-sm text-slate-500 text-center">No one found. Try part of the name or village.</div>
+                  <div className="p-4 text-base text-slate-600 text-center">
+                    No one found. Try part of the name or village.
+                  </div>
                 )}
               </div>
             )}
           </div>
 
-          {/* Action Center, Persona Switcher & Reset */}
-          <div className="flex items-center gap-3">
-            {/* Exceptions quick badge (office staff only) */}
-            {isOfficeRole(currentUser.role) && (
-            <button
-              onClick={() => onNavigateToTab && onNavigateToTab('exceptions')}
-              className="relative p-2 text-slate-600 hover:text-brand-600 hover:bg-slate-100 rounded-lg transition-colors"
-              title="Problems to fix"
-              aria-label={`Problems to fix: ${openExceptionsCount} open`}
-            >
-              <Bell className="w-5 h-5" />
-              {openExceptionsCount > 0 && (
-                <span className="absolute top-1 right-1 bg-red-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Problems to fix (office staff only) — labelled, not just a bell icon */}
+            {office && (
+              <button
+                onClick={() => onNavigateToTab?.('exceptions')}
+                className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 rounded-xl border-2 font-bold text-base ${
+                  openExceptionsCount > 0
+                    ? 'border-red-200 bg-red-50 text-red-800 hover:bg-red-100'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+                aria-label={`Problems to fix: ${openExceptionsCount}`}
+              >
+                <AlertTriangle className="w-5 h-5" />
+                <span className="hidden lg:inline">Problems</span>
+                <span
+                  className={`min-w-[28px] h-7 px-1.5 rounded-full flex items-center justify-center text-sm ${
+                    openExceptionsCount > 0 ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-700'
+                  }`}
+                >
                   {openExceptionsCount}
                 </span>
-              )}
-            </button>
+              </button>
             )}
 
-            {/* Reset Seed Data Button — demo only, Super Admin only */}
+            {/* Reset demo data — Super Admin only */}
             {currentUser.role === 'Super Admin' && (
-            <button
-              onClick={() => {
-                if (window.confirm('This deletes ALL changes and puts back the demo data. This cannot be undone. Continue?')) {
-                  resetAllData();
-                }
-              }}
-              className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors hidden sm:block"
-              title="Reset Demo Data"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
+              <button
+                onClick={() => {
+                  if (
+                    window.confirm('This deletes ALL changes and puts back the demo data. This cannot be undone. Continue?')
+                  ) {
+                    resetAllData();
+                  }
+                }}
+                className="hidden sm:flex items-center gap-2 px-3 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                title="Reset demo data"
+              >
+                <RotateCcw className="w-5 h-5" />
+                <span className="hidden xl:inline text-sm font-semibold">Reset demo</span>
+              </button>
             )}
 
-            {/* Active Persona / Role Switcher */}
-            <div className="relative">
+            {/* Who is signed in */}
+            <div className="relative" ref={roleMenuRef}>
               <button
                 onClick={() => setShowRoleMenu(!showRoleMenu)}
-                className="flex items-center gap-2.5 p-1.5 pl-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all"
+                aria-haspopup="menu"
+                aria-expanded={showRoleMenu}
+                aria-label={`Signed in as ${currentUser.name}. Switch user`}
+                className="flex items-center gap-3 p-1 sm:py-1.5 sm:pl-1.5 sm:pr-3 bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-xl"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={currentUser.avatar}
-                  alt={currentUser.name}
-                  className="w-8 h-8 rounded-lg object-cover border border-brand-200"
-                />
-                <div className="text-left hidden lg:block">
-                  <div className="text-xs font-bold text-slate-900 leading-tight">{currentUser.name}</div>
-                  <div className="text-[10px] font-semibold text-brand-600 flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3" />
-                    <span>{currentUser.role}</span>
-                  </div>
+                <img src={currentUser.avatar} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                <div className="text-left hidden lg:block leading-tight">
+                  <div className="text-base font-bold text-slate-900">{currentUser.name}</div>
+                  <div className="text-sm text-slate-600">{ROLE_LABEL[currentUser.role]}</div>
                 </div>
-                <ChevronDown className="w-4 h-4 text-slate-400" />
+                <ChevronDown className="w-5 h-5 text-slate-600 hidden sm:block" />
               </button>
 
-              {/* Persona Dropdown */}
               {showRoleMenu && (
-                <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-2xl border border-slate-200 py-2 z-50 divide-y divide-slate-100">
-                  <div className="px-3 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-brand-500" />
-                    <span>Switch Role / User</span>
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-2 w-[min(20rem,calc(100vw-2rem))] bg-white rounded-xl shadow-2xl border-2 border-slate-200 py-2 z-50"
+                >
+                  <div className="px-4 py-2 flex items-center justify-between">
+                    <span className="text-base font-bold text-slate-900">Switch user</span>
+                    <button
+                      onClick={() => setShowRoleMenu(false)}
+                      aria-label="Close"
+                      className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
                   </div>
-                  <div className="py-1">
-                    {users.map((u) => (
+                  {users.map((u) => {
+                    const active = u.id === currentUser.id;
+                    return (
                       <button
                         key={u.id}
+                        role="menuitem"
                         onClick={() => {
                           setCurrentUser(u);
                           setShowRoleMenu(false);
                         }}
-                        className={`w-full px-3 py-2 text-left flex items-center gap-3 hover:bg-slate-50 transition-colors ${
-                          u.id === currentUser.id ? 'bg-brand-50/70 border-l-4 border-brand-600' : ''
+                        className={`w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-slate-50 ${
+                          active ? 'bg-brand-50' : ''
                         }`}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-lg object-cover" />
-                        <div>
-                          <div className="text-xs font-bold text-slate-900">{u.name}</div>
-                          <div className="text-[11px] text-slate-500">
-                            {u.role} • {u.division}
+                        <img src={u.avatar} alt="" className="w-11 h-11 rounded-lg object-cover" />
+                        <div className="flex-1">
+                          <div className="text-base font-bold text-slate-900">{u.name}</div>
+                          <div className="text-sm text-slate-600">
+                            {ROLE_LABEL[u.role]} · {u.division}
                           </div>
                         </div>
+                        {active && <Check className="w-6 h-6 text-brand-600" />}
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
