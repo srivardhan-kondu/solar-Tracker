@@ -136,6 +136,45 @@ export interface Installation {
   approvedAt?: string;
 }
 
+// ---------- Site survey (done before installation) ----------
+export type RoofType = 'Concrete' | 'Mud' | 'Sheds' | 'Metal sheets';
+export type ShadeLevel = 'None' | 'Some' | 'Heavy';
+export type SurveyDecision = 'Feasible' | 'Not Feasible';
+
+export interface SurveyPhoto {
+  id: string;
+  url: string; // small JPEG data URL, or a sample image path
+  capturedAt: string;
+}
+
+export interface SiteSurvey {
+  id: string;
+  consumerNumber: string;
+  surveyorId: string;
+  surveyorName: string;
+  status: 'Draft' | 'Submitted';
+  startedAt: string;
+  submittedAt?: string;
+
+  billPhoto?: SurveyPhoto;
+  aadhaarPhoto?: SurveyPhoto;
+
+  roofType?: RoofType;
+  roofPhotos: SurveyPhoto[];
+
+  shadeLevel?: ShadeLevel;
+  shadeSources: string[]; // e.g. Trees, Nearby buildings
+  surroundingsPhotos: SurveyPhoto[];
+
+  decision?: SurveyDecision;
+  decisionNote?: string; // required when Not Feasible
+
+  // Set when office staff reopen a sent survey so the installer can redo it
+  reopenedBy?: string;
+  reopenedAt?: string;
+  reopenNote?: string;
+}
+
 export interface DCRRecord {
   id: string;
   ula: string;
@@ -179,7 +218,8 @@ export type ExceptionType =
   | 'inventory_conflict'
   | 'dcr_mismatch'
   | 'sync_failure'
-  | 'service_overdue';
+  | 'service_overdue'
+  | 'site_not_feasible';
 
 export interface ActionRequiredException {
   id: string;

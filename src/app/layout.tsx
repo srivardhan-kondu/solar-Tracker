@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Atkinson_Hyperlegible } from "next/font/google";
+import { Atkinson_Hyperlegible, Noto_Sans_Telugu } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from "@/context/AppContext";
+import { LanguageProvider } from "@/i18n/LanguageContext";
 
 // Atkinson Hyperlegible: designed by the Braille Institute for readers with low vision.
 const appFont = Atkinson_Hyperlegible({
@@ -9,6 +10,14 @@ const appFont = Atkinson_Hyperlegible({
   weight: ["400", "700"],
   display: "swap",
   variable: "--font-sans",
+});
+
+// Telugu letters: Atkinson has no Telugu, so the browser falls back to this font for them.
+const teluguFont = Noto_Sans_Telugu({
+  subsets: ["telugu"],
+  weight: ["400", "700"],
+  display: "swap",
+  variable: "--font-telugu",
 });
 
 export const metadata: Metadata = {
@@ -28,9 +37,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={appFont.variable}>
+    <html lang="en" className={`${appFont.variable} ${teluguFont.variable}`}>
       <body className="font-sans antialiased min-h-screen bg-slate-50 text-slate-900">
-        <AppProvider>{children}</AppProvider>
+        <LanguageProvider>
+          <AppProvider>{children}</AppProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

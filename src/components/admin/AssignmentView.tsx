@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useLang } from '@/i18n/LanguageContext';
 import {
   UserPlus,
   Users,
@@ -15,6 +16,7 @@ import { useApp } from '@/context/AppContext';
 import { STATUS_LABEL, statusBadgeClass, uniqueSorted } from '@/lib/status';
 
 export const AssignmentView: React.FC = () => {
+  const { t } = useLang();
   const { consumers, users, assignConsumersToInstaller } = useApp();
 
   const [selectedConsumerNumbers, setSelectedConsumerNumbers] = useState<string[]>([]);
@@ -56,16 +58,19 @@ export const AssignmentView: React.FC = () => {
     const finished = chosen.filter((c) => c.status === 'Completed');
     const warnings = [
       takenFromOthers.length > 0 &&
-        `${takenFromOthers.length} of these already belong to another installer (${uniqueSorted(
-          takenFromOthers.map((c) => c.assignedInstallerName)
-        ).join(', ')}) and will be moved.`,
-      finished.length > 0 && `${finished.length} of these are already Done.`,
+        t('{n} of these already belong to another installer ({names}) and will be moved.', {
+          n: takenFromOthers.length,
+          names: uniqueSorted(takenFromOthers.map((c) => c.assignedInstallerName)).join(', '),
+        }),
+      finished.length > 0 && t('{n} of these are already Done.', { n: finished.length }),
     ].filter(Boolean);
-    if (warnings.length > 0 && !window.confirm(`${warnings.join('\n')}\n\nContinue?`)) return;
+    if (warnings.length > 0 && !window.confirm(`${warnings.join('\n')}\n\n${t('Continue?')}`)) return;
 
     assignConsumersToInstaller(selectedConsumerNumbers, targetInstallerId);
     const installer = users.find((u) => u.id === targetInstallerId);
-    setAssignmentNotice(`Assigned ${selectedConsumerNumbers.length} consumers to ${installer?.name || 'Installer'}.`);
+    setAssignmentNotice(
+      t('Assigned {n} consumers to {name}.', { n: selectedConsumerNumbers.length, name: installer?.name || t('Installer') })
+    );
     setSelectedConsumerNumbers([]);
 
     setTimeout(() => {
@@ -79,10 +84,10 @@ export const AssignmentView: React.FC = () => {
     <select
       value={targetInstallerId}
       onChange={(e) => setTargetInstallerId(e.target.value)}
-      aria-label="Installer to assign to"
+      aria-label={t("Installer to assign to")}
       className={`text-base font-semibold bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2.5 text-slate-800 ${extra}`}
     >
-      <option value="">— Choose installer —</option>
+      <option value="">{t("— Choose installer —")}</option>
       {installers.map((inst) => (
         <option key={inst.id} value={inst.id}>
           {inst.name} ({inst.division})
@@ -97,9 +102,9 @@ export const AssignmentView: React.FC = () => {
       disabled={!canAssign}
       title={
         selectedConsumerNumbers.length === 0
-          ? 'Tick at least one consumer first'
+          ? t("Tick at least one consumer first")
           : !targetInstallerId
-          ? 'Choose an installer first'
+          ? t("Choose an installer first")
           : undefined
       }
       className={`px-5 py-2.5 rounded-xl text-base font-bold flex items-center justify-center gap-2 transition-all ${
@@ -107,7 +112,7 @@ export const AssignmentView: React.FC = () => {
       } ${extra}`}
     >
       <UserPlus className="w-5 h-5" />
-      <span>Assign {selectedConsumerNumbers.length} ticked</span>
+      <span>{t('Assign {n} ticked', { n: selectedConsumerNumbers.length })}</span>
     </button>
   );
 
@@ -116,10 +121,8 @@ export const AssignmentView: React.FC = () => {
       {/* Header */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Assign Work</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            1. Tick the consumers below. 2. Choose an installer. 3. Click Assign.
-          </p>
+          <h1 className="text-xl font-bold text-slate-900">{t("Assign Work")}</h1>
+          <p className="text-sm text-slate-500 mt-0.5">{t("1. Tick the consumers below. 2. Choose an installer. 3. Click Assign.")}</p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
@@ -157,11 +160,11 @@ export const AssignmentView: React.FC = () => {
                 <span className="text-xs font-bold bg-brand-50 text-brand-700 px-2 py-0.5 rounded">{inst.division}</span>
               </div>
               <div className="text-xl font-bold text-slate-800">
-                {assignedCount} <span className="text-sm font-normal text-slate-500">consumers assigned</span>
+                {assignedCount} <span className="text-sm font-normal text-slate-500">{t("consumers assigned")}</span>
               </div>
-              <div className="text-sm text-emerald-700 font-semibold">{completedCount} done so far</div>
+              <div className="text-sm text-emerald-700 font-semibold">{t('{n} done so far', { n: completedCount })}</div>
               <div className={`text-sm ${chosen ? 'text-brand-700 font-bold' : 'text-slate-500'}`}>
-                {chosen ? '✓ Chosen' : 'Tap to choose this installer'}
+                {chosen ? t("✓ Chosen") : t("Tap to choose this installer")}
               </div>
             </button>
           );
@@ -176,17 +179,17 @@ export const AssignmentView: React.FC = () => {
             className="text-base font-bold text-brand-700 hover:text-brand-800 flex items-center gap-2"
           >
             {allSelected ? <CheckSquare className="w-6 h-6" /> : <Square className="w-6 h-6 text-slate-500" />}
-            <span>{allSelected ? 'Untick all' : `Tick all (${filteredConsumers.length})`}</span>
+            <span>{allSelected ? t("Untick all") : t('Tick all ({n})', { n: filteredConsumers.length })}</span>
           </button>
 
           <label className="flex items-center gap-2 w-full sm:w-auto">
-            <span className="text-sm text-slate-600 font-semibold whitespace-nowrap">Village:</span>
+            <span className="text-sm text-slate-600 font-semibold whitespace-nowrap">{t("Village:")}</span>
             <select
               value={villageFilter}
               onChange={(e) => setVillageFilter(e.target.value)}
               className="flex-1 sm:flex-none text-base bg-slate-50 border-2 border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-700"
             >
-              <option value="All">All villages</option>
+              <option value="All">{t("All villages")}</option>
               {villages.map((v) => (
                 <option key={v} value={v}>
                   {v}
@@ -216,7 +219,7 @@ export const AssignmentView: React.FC = () => {
                     <span className="flex flex-wrap items-start justify-between gap-2">
                       <span className="text-base font-bold text-slate-900">{c.name}</span>
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${statusBadgeClass(c.status)}`}>
-                        {STATUS_LABEL[c.status]}
+                        {t(STATUS_LABEL[c.status])}
                       </span>
                     </span>
                     <span className="block font-mono text-sm text-slate-700">{c.consumerNumber}</span>
@@ -224,11 +227,11 @@ export const AssignmentView: React.FC = () => {
                       {c.village}, {c.mandal} · {c.capacityKw} kW
                     </span>
                     <span className="block text-sm">
-                      <span className="text-slate-500">Installer: </span>
+                      <span className="text-slate-500">{t("Installer:")}{" "}</span>
                       {c.assignedInstallerName ? (
                         <span className="font-semibold text-slate-900">{c.assignedInstallerName}</span>
                       ) : (
-                        <span className="font-bold text-amber-700">Not assigned</span>
+                        <span className="font-bold text-amber-700">{t("Not assigned")}</span>
                       )}
                     </span>
                   </span>
@@ -243,11 +246,11 @@ export const AssignmentView: React.FC = () => {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
               <tr>
-                <th className="py-3 px-4 w-12">Tick</th>
-                <th className="py-3 px-4">Consumer</th>
-                <th className="py-3 px-4">Village</th>
-                <th className="py-3 px-4">Installer</th>
-                <th className="py-3 px-4 text-right">Status</th>
+                <th className="py-3 px-4 w-12">{t("Tick")}</th>
+                <th className="py-3 px-4">{t("Consumer")}</th>
+                <th className="py-3 px-4">{t("Village")}</th>
+                <th className="py-3 px-4">{t("Installer")}</th>
+                <th className="py-3 px-4 text-right">{t("Status")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -278,12 +281,12 @@ export const AssignmentView: React.FC = () => {
                       {c.assignedInstallerName ? (
                         <span className="font-semibold text-slate-900">{c.assignedInstallerName}</span>
                       ) : (
-                        <span className="text-amber-700 font-bold">Not assigned</span>
+                        <span className="text-amber-700 font-bold">{t("Not assigned")}</span>
                       )}
                     </td>
                     <td className="py-3 px-4 text-right">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap ${statusBadgeClass(c.status)}`}>
-                        {STATUS_LABEL[c.status]}
+                        {t(STATUS_LABEL[c.status])}
                       </span>
                     </td>
                   </tr>

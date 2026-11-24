@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useLang } from '@/i18n/LanguageContext';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -19,6 +20,7 @@ import { ActionRequiredException } from '@/types';
 export const ActionRequiredView: React.FC<{
   onSelectConsumerNumber?: (consumerNumber: string) => void;
 }> = ({ onSelectConsumerNumber }) => {
+  const { t } = useLang();
   const { exceptions, resolveException, dismissException } = useApp();
 
   const [filterType, setFilterType] = useState('All');
@@ -35,6 +37,7 @@ export const ActionRequiredView: React.FC<{
     dcr_mismatch: 'DCR not matched',
     sync_failure: 'Sending failed',
     service_overdue: 'Service overdue',
+    site_not_feasible: 'Site not feasible',
   };
 
   const filteredExceptions = exceptions.filter((e) => {
@@ -56,21 +59,18 @@ export const ActionRequiredView: React.FC<{
       {/* Header */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Problems to Fix</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Things that need someone in the office to look at them: missing photos, location problems, reused serial
-            numbers and unmatched DCR rows.
-          </p>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t("Problems to Fix")}</h1>
+          <p className="text-sm text-slate-500 mt-0.5">{t("Things that need someone in the office to look at them: missing photos, location problems, reused serial numbers and unmatched DCR rows.")}</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full xl:w-auto">
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            aria-label="Filter by problem type"
+            aria-label={t("Filter by problem type")}
             className="text-sm font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700"
           >
-            <option value="All">All problem types</option>
+            <option value="All">{t("All problem types")}</option>
             {Object.entries(TYPE_LABEL).map(([k, v]) => (
               <option key={k} value={k}>
                 {v}
@@ -81,13 +81,13 @@ export const ActionRequiredView: React.FC<{
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            aria-label="Filter by status"
+            aria-label={t("Filter by status")}
             className="text-sm font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700"
           >
-            <option value="Open">Still open</option>
-            <option value="Resolved">Fixed</option>
-            <option value="Dismissed">Dismissed</option>
-            <option value="All">All</option>
+            <option value="Open">{t("Still open")}</option>
+            <option value="Resolved">{t("Fixed")}</option>
+            <option value="Dismissed">{t("Dismissed")}</option>
+            <option value="All">{t("All")}</option>
           </select>
         </div>
       </div>
@@ -114,9 +114,9 @@ export const ActionRequiredView: React.FC<{
                         exc.priority === 'High' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
                       }`}
                     >
-                      {exc.priority} Priority
+                      {t('{p} priority', { p: t(exc.priority) })}
                     </span>
-                    <span className="text-xs text-slate-500 font-semibold">{TYPE_LABEL[exc.type] || exc.type}</span>
+                    <span className="text-xs text-slate-500 font-semibold">{t(TYPE_LABEL[exc.type] || exc.type)}</span>
                   </div>
                   <span
                     className={`text-xs font-bold px-2 py-0.5 rounded-full ${
@@ -125,7 +125,7 @@ export const ActionRequiredView: React.FC<{
                         : 'bg-amber-100 text-amber-800'
                     }`}
                   >
-                    {exc.status}
+                    {t(exc.status)}
                   </span>
                 </div>
 
@@ -141,7 +141,7 @@ export const ActionRequiredView: React.FC<{
                         <button
                           onClick={() => onSelectConsumerNumber(exc.consumerNumber!)}
                           className="font-mono font-bold text-brand-700 underline mr-2"
-                          title="Open this consumer"
+                          title={t("Open this consumer")}
                         >
                           {exc.consumerNumber}
                         </button>
@@ -155,10 +155,10 @@ export const ActionRequiredView: React.FC<{
 
                 {exc.resolutionNote && (
                   <div className="p-2.5 bg-emerald-50 rounded-xl text-xs text-emerald-900 border border-emerald-200">
-                    <span className="font-bold">Note:</span> {exc.resolutionNote}
+                    <span className="font-bold">{t("Note:")}</span> {exc.resolutionNote}
                     {exc.resolvedBy && (
                       <div className="text-xs text-emerald-700 mt-0.5">
-                        Fixed by {exc.resolvedBy} on {exc.resolvedAt}
+                        {t('Fixed by {who} on {when}', { who: exc.resolvedBy, when: exc.resolvedAt })}
                       </div>
                     )}
                   </div>
@@ -173,9 +173,7 @@ export const ActionRequiredView: React.FC<{
                         setResolutionNote('');
                       }}
                       className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-bold transition-colors shadow-sm"
-                    >
-                      Mark as fixed
-                    </button>
+                    >{t("Mark as fixed")}</button>
                     <button
                       onClick={() => {
                         setSelectedException(exc);
@@ -183,9 +181,7 @@ export const ActionRequiredView: React.FC<{
                         setResolutionNote('');
                       }}
                       className="px-4 py-2.5 border border-slate-300 hover:bg-slate-50 text-slate-600 rounded-lg text-sm font-semibold"
-                    >
-                      Not a problem
-                    </button>
+                    >{t("Not a problem")}</button>
                   </div>
                 )}
               </div>
@@ -193,7 +189,7 @@ export const ActionRequiredView: React.FC<{
           })
         ) : (
           <div className="md:col-span-2 lg:col-span-1 xl:col-span-2 py-12 text-center text-base text-slate-600 bg-white rounded-2xl border border-slate-200">
-            {filterStatus === 'Open' && filterType === 'All' ? 'Nothing to fix right now. 🎉' : 'Nothing matches these filters.'}
+            {filterStatus === 'Open' && filterType === 'All' ? t("Nothing to fix right now. 🎉") : t("Nothing matches these filters.")}
           </div>
         )}
       </div>
@@ -203,18 +199,18 @@ export const ActionRequiredView: React.FC<{
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200">
             <h3 className="text-base font-bold text-slate-900">
-              {mode === 'resolve' ? 'Mark as fixed' : 'Not a problem'}: {selectedException.title}
+              {mode === 'resolve' ? t("Mark as fixed") : t("Not a problem")}: {selectedException.title}
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed">{selectedException.description}</p>
 
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">
-                {mode === 'resolve' ? 'What did you do to fix it?' : 'Why is this not a problem?'} (required)
+                {mode === 'resolve' ? t("What did you do to fix it?") : t("Why is this not a problem?")} {t('(required)')}
               </label>
               <textarea
                 value={resolutionNote}
                 onChange={(e) => setResolutionNote(e.target.value)}
-                placeholder="e.g. Supervisor physically validated site coordinates on ground and approved exception..."
+                placeholder={t("e.g. Supervisor physically validated site coordinates on ground and approved exception...")}
                 autoFocus
                 className="w-full p-2.5 border border-slate-300 rounded-xl text-sm h-24 focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
@@ -224,16 +220,12 @@ export const ActionRequiredView: React.FC<{
               <button
                 onClick={() => setSelectedException(null)}
                 className="px-4 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
+              >{t("Cancel")}</button>
               <button
                 onClick={handleResolve}
                 disabled={!resolutionNote.trim()}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed"
-              >
-                Save
-              </button>
+              >{t("Save")}</button>
             </div>
           </div>
         </div>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400"><rect width="600" height="400" fill="#bae6fd"/><circle cx="510" cy="70" r="36" fill="#fde047"/>
+  <rect x="0" y="230" width="600" height="170" fill="#a3a3a3"/><polygon points="40,230 560,230 520,180 80,180" fill="#d4d4d4" stroke="#737373" stroke-width="4"/>
+  <rect x="60" y="230" width="480" height="122" fill="#e5e5e5" stroke="#737373" stroke-width="4"/><rect x="420" y="130" width="70" height="60" fill="#1e293b"/><rect x="430" y="120" width="50" height="12" fill="#334155"/>
+  <rect x="0" y="352" width="600" height="48" fill="rgba(15,23,42,0.72)"/>
+  <text x="20" y="384" font-size="24" fill="#fff" font-family="Arial, sans-serif" font-weight="bold">Sample photo · Roof (concrete)</text></svg>

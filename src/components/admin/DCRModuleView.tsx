@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useLang } from '@/i18n/LanguageContext';
 import {
   FileSpreadsheet,
   Upload,
@@ -31,6 +32,7 @@ const dcrStatusClass = (status: string) =>
     : 'bg-red-100 text-red-800';
 
 export const DCRModuleView: React.FC = () => {
+  const { t } = useLang();
   const { dcrRecords, reconcileDCRFile } = useApp();
 
   const [dcrFile, setDcrFile] = useState<File | null>(null);
@@ -83,16 +85,18 @@ export const DCRModuleView: React.FC = () => {
           .filter((r) => r.ula || r.dcrNumber);
 
         if (parsed.length === 0) {
-          setParseError('No ULA and DCR numbers were found. The file needs two columns named "ULA" and "DCR_NUMBER".');
+          setParseError(t('No ULA and DCR numbers were found. The file needs two columns named "ULA" and "DCR_NUMBER".'));
         } else if (parsed.some((r) => !r.ula || !r.dcrNumber)) {
           setParseError(
-            `${parsed.filter((r) => !r.ula || !r.dcrNumber).length} rows are missing a ULA or a DCR number. Please fill them in and upload again.`
+            t('{n} rows are missing a ULA or a DCR number. Please fill them in and upload again.', {
+              n: parsed.filter((r) => !r.ula || !r.dcrNumber).length,
+            })
           );
         } else {
           setDcrRows(parsed);
         }
       } catch {
-        setParseError('This file could not be read. Please save it as Excel (.xlsx) or CSV and try again.');
+        setParseError(t('This file could not be read. Please save it as Excel (.xlsx) or CSV and try again.'));
       }
     };
     reader.readAsBinaryString(file);
@@ -122,11 +126,8 @@ export const DCRModuleView: React.FC = () => {
       {/* Header */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">DCR Numbers</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Upload the DCR list you receive. Each row is matched to a consumer using the ULA number, and the DCR number
-            is saved on that consumer automatically.
-          </p>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t("DCR Numbers")}</h1>
+          <p className="text-sm text-slate-500 mt-0.5">{t("Upload the DCR list you receive. Each row is matched to a consumer using the ULA number, and the DCR number is saved on that consumer automatically.")}</p>
         </div>
 
         <button
@@ -134,7 +135,7 @@ export const DCRModuleView: React.FC = () => {
           className="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors"
         >
           <Download className="w-4 h-4 text-brand-600" />
-          <span>Download DCR Template</span>
+          <span>{t("Download DCR Template")}</span>
         </button>
       </div>
 
@@ -143,12 +144,12 @@ export const DCRModuleView: React.FC = () => {
         <div className="border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-xl p-6 text-center transition-colors bg-slate-50/50">
           <FileSpreadsheet className="w-10 h-10 text-brand-600 mx-auto mb-2" />
           <div className="text-sm font-bold text-slate-800">
-            {dcrFile ? dcrFile.name : 'Upload Discom / MNRE DCR Excel Spreadsheet'}
+            {dcrFile ? dcrFile.name : t("Upload Discom / MNRE DCR Excel Spreadsheet")}
           </div>
-          <p className="text-sm text-slate-500 mt-1">The file needs two columns: ULA and DCR_NUMBER. Download the template to see the format.</p>
+          <p className="text-sm text-slate-500 mt-1">{t("The file needs two columns: ULA and DCR_NUMBER. Download the template to see the format.")}</p>
 
           <label className="mt-3 inline-block px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold cursor-pointer shadow-sm transition-colors">
-            <span>Select DCR File</span>
+            <span>{t("Select DCR File")}</span>
             <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} className="hidden" />
           </label>
         </div>
@@ -166,17 +167,15 @@ export const DCRModuleView: React.FC = () => {
             <div className="flex justify-between items-center">
               <div>
                 <div className="text-xs font-bold text-slate-900">
-                  {dcrRows.length} rows ready to match
+                  {t('{n} rows ready to match', { n: dcrRows.length })}
                 </div>
-                <div className="text-xs text-slate-500">
-                  System will cross-reference ULA against consumer master database.
-                </div>
+                <div className="text-xs text-slate-500">{t("System will cross-reference ULA against consumer master database.")}</div>
               </div>
               <button
                 onClick={handleExecuteReconciliation}
                 className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-colors"
               >
-                <span>Match now</span>
+                <span>{t("Match now")}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -202,25 +201,25 @@ export const DCRModuleView: React.FC = () => {
                 )}
                 <div className="space-y-1">
                   <div className="font-bold">
-                    {problems === 0 ? 'All rows matched' : `${problems} rows need attention`}
+                    {problems === 0 ? t("All rows matched") : t('{n} rows need attention', { n: problems })}
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    <span className="font-semibold text-emerald-700">✓ {reconcileResult.matched} matched and saved</span>
+                    <span className="font-semibold text-emerald-700">✓ {t('{n} matched and saved', { n: reconcileResult.matched })}</span>
                     {reconcileResult.unmatched > 0 && (
                       <span className="font-semibold text-amber-800">
-                        ⚠ {reconcileResult.unmatched} ULA numbers not found in the consumer list
+                        ⚠ {t('{n} ULA numbers not found in the consumer list', { n: reconcileResult.unmatched })}
                       </span>
                     )}
                     {reconcileResult.conflicts > 0 && (
                       <span className="font-semibold text-red-700">
-                        ✕ {reconcileResult.conflicts} consumers already have a different DCR number
+                        ✕ {t('{n} consumers already have a different DCR number', { n: reconcileResult.conflicts })}
                       </span>
                     )}
                   </div>
                   {problems > 0 && (
                     <p>
-                      They are listed in the table below.
-                      {reconcileResult.unmatched > 0 && ' Rows whose ULA was not found were also added to "Problems to Fix".'}
+                      {t('They are listed in the table below.')}
+                      {reconcileResult.unmatched > 0 && ' ' + t('Rows whose ULA was not found were also added to "Problems to Fix".')}
                     </p>
                   )}
                 </div>
@@ -238,26 +237,26 @@ export const DCRModuleView: React.FC = () => {
               type="search"
               value={searchUla}
               onChange={(e) => setSearchUla(e.target.value)}
-              placeholder="Search ULA, DCR or consumer"
-              aria-label="Search DCR rows"
+              placeholder={t("Search ULA, DCR or consumer")}
+              aria-label={t("Search DCR rows")}
               className="w-full xl:w-80 pl-10 pr-3 py-2 text-base bg-slate-50 border-2 border-slate-200 rounded-xl focus:outline-none focus:border-brand-600"
             />
           </label>
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            aria-label="Filter by result"
+            aria-label={t("Filter by result")}
             className="text-base bg-slate-50 border-2 border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-700"
           >
-            <option value="All">All rows</option>
-            <option value="Matched">Matched</option>
-            <option value="ULA Not Found">ULA not found</option>
-            <option value="Existing Value Conflict">Different DCR already saved</option>
+            <option value="All">{t("All rows")}</option>
+            <option value="Matched">{t("Matched")}</option>
+            <option value="ULA Not Found">{t("ULA not found")}</option>
+            <option value="Existing Value Conflict">{t("Different DCR already saved")}</option>
           </select>
         </div>
 
         {filteredDcrList.length === 0 && (
-          <div className="p-10 text-center text-base text-slate-600">No DCR rows match.</div>
+          <div className="p-10 text-center text-base text-slate-600">{t("No DCR rows match.")}</div>
         )}
 
         {/* Smaller screens: cards */}
@@ -267,22 +266,21 @@ export const DCRModuleView: React.FC = () => {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="font-mono text-base font-bold text-brand-700 break-all">{d.dcrNumber}</div>
-                  <div className="text-sm text-slate-600 break-all">
-                    ULA <span className="font-mono">{d.ula}</span>
+                  <div className="text-sm text-slate-600 break-all">{t("ULA")}{" "}<span className="font-mono">{d.ula}</span>
                   </div>
                 </div>
                 <span className={`px-3 py-1 rounded-full font-bold text-sm ${dcrStatusClass(d.status)}`}>
-                  {DCR_STATUS_LABEL[d.status] || d.status}
+                  {t(DCR_STATUS_LABEL[d.status] || d.status)}
                 </span>
               </div>
               <div className="text-sm">
-                <span className="text-slate-500">Consumer: </span>
+                <span className="text-slate-500">{t("Consumer:")}{" "}</span>
                 {d.consumerNumber ? (
                   <span className="text-slate-900 font-semibold">
                     {d.consumerName} (<span className="font-mono">{d.consumerNumber}</span>)
                   </span>
                 ) : (
-                  <span className="text-slate-700">No consumer with this ULA</span>
+                  <span className="text-slate-700">{t("No consumer with this ULA")}</span>
                 )}
               </div>
               {d.conflictDetails && <div className="text-sm text-slate-700">{d.conflictDetails}</div>}
@@ -299,10 +297,10 @@ export const DCRModuleView: React.FC = () => {
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
                 <tr>
-                  <th className="py-3 px-4">DCR number / ULA</th>
-                  <th className="py-3 px-4">Consumer</th>
-                  <th className="py-3 px-4">From file</th>
-                  <th className="py-3 px-4 text-right">Result</th>
+                  <th className="py-3 px-4">{t("DCR number / ULA")}</th>
+                  <th className="py-3 px-4">{t("Consumer")}</th>
+                  <th className="py-3 px-4">{t("From file")}</th>
+                  <th className="py-3 px-4 text-right">{t("Result")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -319,7 +317,7 @@ export const DCRModuleView: React.FC = () => {
                           <div className="font-mono text-slate-500">{d.consumerNumber}</div>
                         </>
                       ) : (
-                        <span className="text-slate-600">No consumer with this ULA</span>
+                        <span className="text-slate-600">{t("No consumer with this ULA")}</span>
                       )}
                     </td>
                     <td className="py-3 px-4 text-slate-600">
@@ -328,7 +326,7 @@ export const DCRModuleView: React.FC = () => {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <span className={`px-2.5 py-1 rounded-full font-bold text-xs whitespace-nowrap ${dcrStatusClass(d.status)}`}>
-                        {DCR_STATUS_LABEL[d.status] || d.status}
+                        {t(DCR_STATUS_LABEL[d.status] || d.status)}
                       </span>
                     </td>
                   </tr>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useLang } from '@/i18n/LanguageContext';
 import {
   LayoutDashboard,
   Users,
@@ -16,9 +17,11 @@ import {
   Smartphone,
   MoreHorizontal,
   X,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { canSeeTab } from '@/lib/access';
+import { needsSurvey } from '@/lib/survey';
 
 interface AppSidebarProps {
   currentTab: string;
@@ -26,7 +29,8 @@ interface AppSidebarProps {
 }
 
 export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTab }) => {
-  const { exceptions, dcrRecords, currentUser } = useApp();
+  const { t } = useLang();
+  const { exceptions, dcrRecords, currentUser, consumers, surveys, installations } = useApp();
   const [moreOpen, setMoreOpen] = useState(false);
 
   // Esc closes the "More" sheet
@@ -37,6 +41,11 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTa
     return () => window.removeEventListener('keydown', onKey);
   }, [moreOpen]);
 
+  // Installers see how many of their homes still need a site survey
+  const surveysToDo =
+    currentUser.role === 'Installer'
+      ? consumers.filter((c) => c.assignedInstallerId === currentUser.id && needsSurvey(c, surveys, installations)).length
+      : 0;
   const openExceptionsCount = exceptions.filter((e) => e.status === 'Open').length;
   const dcrPendingCount = dcrRecords.filter((d) => d.status === 'ULA Not Found' || d.status === 'Existing Value Conflict').length;
 
@@ -47,6 +56,13 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTa
       short: 'Home',
       icon: LayoutDashboard,
       badge: undefined,
+    },
+    {
+      id: 'survey',
+      label: 'Site Survey',
+      short: 'Survey',
+      icon: ClipboardCheck,
+      badge: surveysToDo > 0 ? surveysToDo : undefined,
     },
     {
       id: 'field_portal',
@@ -141,7 +157,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTa
         return (
           <>
             <nav
-              aria-label="Main menu"
+              aria-label={t("Main menu")}
               className="no-print lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t-2 border-slate-200 flex pb-[env(safe-area-inset-bottom)]"
             >
               {barItems.map((item) => {
@@ -157,7 +173,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTa
                     }`}
                   >
                     <Icon className="w-7 h-7 flex-shrink-0" />
-                    <span className="text-center leading-tight">{(item as { short?: string }).short ?? item.label}</span>
+                    <span className="text-center leading-tight">{t((item as { short?: string }).short ?? item.label)}</span>
                     {item.badge && (
                       <span className="absolute top-1 right-1/2 translate-x-6 bg-red-600 text-white text-xs font-bold rounded-full min-w-[24px] h-6 px-1.5 flex items-center justify-center">
                         {item.badge}
@@ -176,7 +192,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTa
                   }`}
                 >
                   <MoreHorizontal className="w-7 h-7" />
-                  <span>More</span>
+                  <span>{t("More")}</span>
                   {moreBadge > 0 && (
                     <span className="absolute top-1 right-1/2 translate-x-6 bg-red-600 text-white text-xs font-bold rounded-full min-w-[24px] h-6 px-1.5 flex items-center justify-center">
                       {moreBadge}
@@ -193,14 +209,14 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTa
                 onClick={(e) => e.target === e.currentTarget && setMoreOpen(false)}
                 role="dialog"
                 aria-modal="true"
-                aria-label="All screens"
+                aria-label={t("All screens")}
               >
                 <div className="w-full max-h-[85vh] overflow-y-auto bg-white rounded-t-2xl p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-lg font-bold text-slate-900">All screens</h2>
+                    <h2 className="text-lg font-bold text-slate-900">{t("All screens")}</h2>
                     <button
                       onClick={() => setMoreOpen(false)}
-                      aria-label="Close"
+                      aria-label={t("Close")}
                       className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-700 hover:bg-slate-100"
                     >
                       <X className="w-6 h-6" />
@@ -221,7 +237,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTa
                         >
                           <span className="flex items-center gap-3">
                             <Icon className={`w-6 h-6 flex-shrink-0 ${isActive ? 'text-white' : 'text-brand-600'}`} />
-                            {item.label}
+                            {t(item.label)}
                           </span>
                           {item.badge && (
                             <span
@@ -261,7 +277,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTa
               >
                 <span className="flex items-center gap-3 text-left">
                   <Icon className={`w-6 h-6 flex-shrink-0 ${isActive ? 'text-white' : 'text-brand-600'}`} />
-                  <span>{item.label}</span>
+                  <span>{t(item.label)}</span>
                 </span>
 
                 {item.badge && (

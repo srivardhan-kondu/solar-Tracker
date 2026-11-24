@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useLang } from '@/i18n/LanguageContext';
 import {
   Box,
   CheckCircle2,
@@ -21,6 +22,7 @@ const statusClass = (status: string) =>
     : 'bg-red-100 text-red-800';
 
 export const InventoryView: React.FC = () => {
+  const { t } = useLang();
   const { inventory } = useApp();
 
   const [activeType, setActiveType] = useState<'all' | 'panel' | 'inverter'>('all');
@@ -46,16 +48,18 @@ export const InventoryView: React.FC = () => {
     if (!sn) return;
     const item = inventory.find((i) => i.serialNumber.toUpperCase() === sn);
     if (!item) {
-      setTestResult({ success: false, message: `${sn} is not in the stock list.` });
+      setTestResult({ success: false, message: t('{sn} is not in the stock list.', { sn }) });
     } else if (item.status === 'Available') {
-      setTestResult({ success: true, message: `${sn} (${item.brand} ${item.type}) is in the store and free to use.` });
+      setTestResult({ success: true, message: t('{sn} ({brand}) is in the store and free to use.', { sn, brand: item.brand }) });
     } else if (item.status === 'Installed') {
       setTestResult({
         success: false,
-        message: `${sn} is already fitted at consumer ${item.linkedConsumerNumber}${item.installedDate ? ` (on ${item.installedDate})` : ''}.`,
+        message: item.installedDate
+          ? t('{sn} is already fitted at consumer {c} (on {date}).', { sn, c: item.linkedConsumerNumber, date: item.installedDate })
+          : t('{sn} is already fitted at consumer {c}.', { sn, c: item.linkedConsumerNumber }),
       });
     } else {
-      setTestResult({ success: false, message: `${sn} is marked "${item.status}" and cannot be used.` });
+      setTestResult({ success: false, message: t('{sn} is marked "{status}" and cannot be used.', { sn, status: t(item.status) }) });
     }
   };
 
@@ -64,15 +68,13 @@ export const InventoryView: React.FC = () => {
       {/* Header */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Panels & Inverters Stock</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Every panel and inverter, and which home it is fitted at. A serial number can only be used once.
-          </p>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t("Panels & Inverters Stock")}</h1>
+          <p className="text-sm text-slate-500 mt-0.5">{t("Every panel and inverter, and which home it is fitted at. A serial number can only be used once.")}</p>
         </div>
 
         <div className="flex items-center gap-2 text-xs font-bold bg-emerald-50 text-emerald-800 px-3 py-1.5 rounded-xl border border-emerald-200">
           <Lock className="w-4 h-4 text-emerald-600" />
-          <span>Each serial used only once</span>
+          <span>{t("Each serial used only once")}</span>
         </div>
       </div>
 
@@ -80,11 +82,9 @@ export const InventoryView: React.FC = () => {
       <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-lg border border-slate-800 space-y-3">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-amber-400" />
-          <h3 className="text-base font-bold">Look up a serial number</h3>
+          <h3 className="text-base font-bold">{t("Look up a serial number")}</h3>
         </div>
-        <p className="text-sm text-slate-300">
-          Check whether a panel or inverter is free, already fitted, or damaged. This only looks; it changes nothing.
-        </p>
+        <p className="text-sm text-slate-300">{t("Check whether a panel or inverter is free, already fitted, or damaged. This only looks; it changes nothing.")}</p>
 
         <form
           className="flex flex-col sm:flex-row gap-2 max-w-lg"
@@ -97,16 +97,14 @@ export const InventoryView: React.FC = () => {
             type="text"
             value={testSerial}
             onChange={(e) => setTestSerial(e.target.value.toUpperCase())}
-            placeholder="e.g. SP-540W-260301"
-            aria-label="Serial number to look up"
+            placeholder={t("e.g. SP-540W-260301")}
+            aria-label={t("Serial number to look up")}
             className="flex-1 px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
           <button
             type="submit"
             className="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-colors"
-          >
-            Look up
-          </button>
+          >{t("Look up")}</button>
         </form>
 
         {testResult && (
@@ -123,7 +121,7 @@ export const InventoryView: React.FC = () => {
               <ShieldAlert className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
             )}
             <div>
-              <div className="font-bold">{testResult.success ? 'Free to use' : 'Cannot be used'}</div>
+              <div className="font-bold">{testResult.success ? t("Free to use") : t("Cannot be used")}</div>
               <div className="mt-0.5">{testResult.message}</div>
             </div>
           </div>
@@ -134,7 +132,7 @@ export const InventoryView: React.FC = () => {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-200 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-3">
           {/* Equipment type switcher */}
-          <div className="grid grid-cols-3 gap-2" role="group" aria-label="Equipment type">
+          <div className="grid grid-cols-3 gap-2" role="group" aria-label={t("Equipment type")}>
             {[
               { key: 'all', label: 'All' },
               { key: 'panel', label: 'Panels' },
@@ -158,29 +156,29 @@ export const InventoryView: React.FC = () => {
               type="search"
               value={searchSerial}
               onChange={(e) => setSearchSerial(e.target.value)}
-              placeholder="Search serial, brand or consumer"
-              aria-label="Search stock"
+              placeholder={t("Search serial, brand or consumer")}
+              aria-label={t("Search stock")}
               className="text-base bg-slate-50 border-2 border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-brand-600"
             />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              aria-label="Filter by status"
+              aria-label={t("Filter by status")}
               className="text-base bg-slate-50 border-2 border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-700"
             >
-              <option value="All">All statuses</option>
-              <option value="Available">Available</option>
-              <option value="Installed">Installed</option>
-              <option value="Reserved">Reserved</option>
-              <option value="Returned">Returned</option>
-              <option value="Damaged">Damaged</option>
-              <option value="Quarantined">Quarantined</option>
+              <option value="All">{t("All statuses")}</option>
+              <option value="Available">{t("Available")}</option>
+              <option value="Installed">{t("Installed")}</option>
+              <option value="Reserved">{t("Reserved")}</option>
+              <option value="Returned">{t("Returned")}</option>
+              <option value="Damaged">{t("Damaged")}</option>
+              <option value="Quarantined">{t("Quarantined")}</option>
             </select>
           </div>
         </div>
 
         {filteredInventory.length === 0 && (
-          <div className="p-10 text-center text-base text-slate-600">Nothing matches your search.</div>
+          <div className="p-10 text-center text-base text-slate-600">{t("Nothing matches your search.")}</div>
         )}
 
         {/* Smaller screens: cards */}
@@ -191,19 +189,19 @@ export const InventoryView: React.FC = () => {
                 <div className="min-w-0">
                   <div className="font-mono text-base font-bold text-slate-900 break-all">{item.serialNumber}</div>
                   <div className="text-sm text-slate-600 capitalize">
-                    {item.type} · {item.brand} {item.model}
+                    {t(item.type === 'panel' ? 'Panel' : 'Inverter')} · {item.brand} {item.model}
                   </div>
                 </div>
-                <span className={`px-3 py-1 rounded-full font-bold text-sm ${statusClass(item.status)}`}>{item.status}</span>
+                <span className={`px-3 py-1 rounded-full font-bold text-sm ${statusClass(item.status)}`}>{t(item.status)}</span>
               </div>
               <div className="text-sm">
-                <span className="text-slate-500">Fitted at: </span>
+                <span className="text-slate-500">{t("Fitted at:")}{" "}</span>
                 {item.linkedConsumerNumber ? (
                   <span className="font-mono font-bold text-emerald-800">{item.linkedConsumerNumber}</span>
                 ) : (
-                  <span className="text-slate-700">In store</span>
+                  <span className="text-slate-700">{t("In store")}</span>
                 )}
-                <span className="text-slate-500"> · Batch </span>
+                <span className="text-slate-500">{" "}{t("· Batch")}{" "}</span>
                 <span className="font-mono text-slate-700">{item.batch}</span>
               </div>
             </li>
@@ -216,10 +214,10 @@ export const InventoryView: React.FC = () => {
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
                 <tr>
-                  <th className="py-3 px-4">Serial number</th>
-                  <th className="py-3 px-4">Make & model</th>
-                  <th className="py-3 px-4">Fitted at</th>
-                  <th className="py-3 px-4 text-right">Status</th>
+                  <th className="py-3 px-4">{t("Serial number")}</th>
+                  <th className="py-3 px-4">{t("Make & model")}</th>
+                  <th className="py-3 px-4">{t("Fitted at")}</th>
+                  <th className="py-3 px-4 text-right">{t("Status")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -228,7 +226,7 @@ export const InventoryView: React.FC = () => {
                     <td className="py-3 px-4">
                       <div className="font-mono font-bold text-slate-900">{item.serialNumber}</div>
                       <div className="text-slate-500 capitalize">
-                        {item.type} · batch <span className="font-mono">{item.batch}</span>
+                        {t(item.type === 'panel' ? 'Panel' : 'Inverter')} · {t('batch')} <span className="font-mono">{item.batch}</span>
                       </div>
                     </td>
                     <td className="py-3 px-4">
@@ -239,11 +237,11 @@ export const InventoryView: React.FC = () => {
                       {item.linkedConsumerNumber ? (
                         <span className="font-mono font-bold text-emerald-800">{item.linkedConsumerNumber}</span>
                       ) : (
-                        <span className="text-slate-600">In store</span>
+                        <span className="text-slate-600">{t("In store")}</span>
                       )}
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <span className={`px-2.5 py-1 rounded-full font-bold text-xs ${statusClass(item.status)}`}>{item.status}</span>
+                      <span className={`px-2.5 py-1 rounded-full font-bold text-xs ${statusClass(item.status)}`}>{t(item.status)}</span>
                     </td>
                   </tr>
                 ))}

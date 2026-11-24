@@ -15,8 +15,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
-        mono: ["var(--font-sans)", "ui-monospace", "monospace"],
+        sans: ["var(--font-sans)", "var(--font-telugu)", "system-ui", "sans-serif"],
+        mono: ["var(--font-sans)", "var(--font-telugu)", "ui-monospace", "monospace"],
       },
       fontSize: {
         xs: ["15px", { lineHeight: "1.45" }],

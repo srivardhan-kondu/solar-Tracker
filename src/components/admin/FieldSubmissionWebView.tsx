@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useLang } from '@/i18n/LanguageContext';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -21,6 +22,7 @@ import {
   photosDone,
   REQUIRED_PHOTOS,
 } from '@/lib/installationSteps';
+import { canInstall, needsSurvey } from '@/lib/survey';
 
 const PHOTO_GUIDES: Record<PhotoCategory, { title: string; hint: string; sampleUrl: string }> = {
   front: {
@@ -80,6 +82,7 @@ const btnBack = 'px-5 py-3 border border-slate-300 rounded-xl text-sm font-semib
 export const FieldSubmissionWebView: React.FC<{
   onFinished: () => void;
 }> = ({ onFinished }) => {
+  const { t } = useLang();
   const {
     consumers,
     currentUser,
@@ -94,14 +97,19 @@ export const FieldSubmissionWebView: React.FC<{
     activeStep,
     setDraftStep,
     updateDraft,
+    surveys,
+    installations,
   } = useApp();
 
   // Installers see only their own jobs; office staff see every open job.
-  const openJobs = consumers.filter(
+  const myJobs = consumers.filter(
     (c) =>
       !CLOSED_STATUSES.includes(c.status) &&
       (currentUser.role !== 'Installer' || c.assignedInstallerId === currentUser.id)
   );
+  // Only homes the site survey marked Feasible can be installed
+  const openJobs = myJobs.filter((c) => canInstall(surveys, installations, c.consumerNumber));
+  const waitingForSurvey = myJobs.filter((c) => needsSurvey(c, surveys, installations)).length;
 
   const [selectedConsumerNum, setSelectedConsumerNum] = useState<string>('');
   const [panelInput, setPanelInput] = useState<string[]>(['', '', '', '']);
@@ -123,7 +131,9 @@ export const FieldSubmissionWebView: React.FC<{
     if (
       hasProgress(installerDraft) &&
       !window.confirm(
-        `You have unsent work for ${installerDraft!.consumerNumber}. If you switch, that work will be lost. Switch anyway?`
+        t('You have unsent work for {num}. If you switch, that work will be lost. Switch anyway?', {
+          num: installerDraft!.consumerNumber,
+        })
       )
     ) {
       return;
@@ -192,7 +202,7 @@ export const FieldSubmissionWebView: React.FC<{
   };
 
   const StepFooter: React.FC<{ step: number; nextLabel: string }> = ({ step, nextLabel }) => {
-    const blocker = stepBlocker(installerDraft, step);
+    const blocker = stepBlocker(installerDraft, step, t);
     return (
       <div className="pt-4 space-y-2">
         {blocker && (
@@ -202,9 +212,7 @@ export const FieldSubmissionWebView: React.FC<{
           </div>
         )}
         <div className="flex justify-between">
-          <button onClick={() => goTo(step - 1)} className={btnBack}>
-            Back
-          </button>
+          <button onClick={() => goTo(step - 1)} className={btnBack}>{t("Back")}</button>
           <button onClick={() => goTo(step + 1)} disabled={!!blocker} className={btnPrimary}>
             <span>{nextLabel}</span>
             <ArrowRight className="w-4 h-4" />
@@ -217,7 +225,7 @@ export const FieldSubmissionWebView: React.FC<{
   // ---------- After submission ----------
   if (submitted) {
     const { result, draft } = submitted;
-    const missing = missingItems(draft);
+    const missing = missingItems(draft, t);
     const tone = result.isOffline ? 'amber' : missing.length ? 'amber' : 'emerald';
     return (
       <div className="max-w-xl mx-auto bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center space-y-5">
@@ -230,22 +238,22 @@ export const FieldSubmissionWebView: React.FC<{
         </div>
         <div>
           <h2 className="text-xl font-bold text-slate-900">
-            {result.isOffline ? 'Saved on this device' : missing.length ? 'Sent, with items missing' : 'Installation sent'}
+            {result.isOffline ? t("Saved on this device") : missing.length ? t("Sent, with items missing") : t("Installation sent")}
           </h2>
           <p className="text-sm text-slate-600 mt-2">{result.message}</p>
         </div>
         <div className="bg-slate-50 rounded-xl p-4 text-sm text-left space-y-1">
           <div>
-            <span className="text-slate-500">Consumer:</span> <span className="font-semibold">{draft.consumerNumber}</span>
+            <span className="text-slate-500">{t("Consumer:")}</span> <span className="font-semibold">{draft.consumerNumber}</span>
           </div>
           <div>
-            <span className="text-slate-500">Panels:</span> {panelsDone(draft)} of 4
+            <span className="text-slate-500">{t("Panels:")}</span> {t('{n} of {total}', { n: panelsDone(draft), total: 4 })}
           </div>
           <div>
-            <span className="text-slate-500">Inverter:</span> {draft.inverterSerial || 'Not scanned'}
+            <span className="text-slate-500">{t("Inverter:")}</span> {draft.inverterSerial || t("Not scanned")}
           </div>
           <div>
-            <span className="text-slate-500">Photos:</span> {photosDone(draft)} of 7
+            <span className="text-slate-500">{t("Photos:")}</span> {t('{n} of {total}', { n: photosDone(draft), total: 7 })}
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -255,12 +263,8 @@ export const FieldSubmissionWebView: React.FC<{
               setSelectedConsumerNum('');
             }}
             className={btnPrimary + ' justify-center'}
-          >
-            Start next installation
-          </button>
-          <button onClick={onFinished} className={btnBack}>
-            See all installations
-          </button>
+          >{t("Start next installation")}</button>
+          <button onClick={onFinished} className={btnBack}>{t("See all installations")}</button>
         </div>
       </div>
     );
@@ -271,21 +275,19 @@ export const FieldSubmissionWebView: React.FC<{
       {/* Header */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">New Installation</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Follow the steps one by one. Your work is saved as you go.
-          </p>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t("New Installation")}</h1>
+          <p className="text-sm text-slate-500 mt-0.5">{t("Follow the steps one by one. Your work is saved as you go.")}</p>
         </div>
 
         {/* Consumer Picker */}
         <label className="flex flex-col sm:flex-row sm:items-center gap-2 w-full xl:w-auto">
-          <span className="text-sm font-semibold text-slate-700">Consumer:</span>
+          <span className="text-sm font-semibold text-slate-700">{t("Consumer:")}</span>
           <select
             value={activeConsumerNum}
             onChange={(e) => handlePickConsumer(e.target.value)}
             className="text-sm bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-slate-800 w-full sm:w-auto sm:min-w-[320px]"
           >
-            <option value="">— Choose a consumer —</option>
+            <option value="">{t("— Choose a consumer —")}</option>
             {/* Keep the draft's consumer listed even if it is no longer "open" */}
             {currentConsumer && !openJobs.some((c) => c.id === currentConsumer.id) && (
               <option value={currentConsumer.consumerNumber}>
@@ -303,12 +305,21 @@ export const FieldSubmissionWebView: React.FC<{
 
       {!installerDraft ? (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-10 text-center space-y-2">
-          <div className="text-base font-bold text-slate-900">Choose a consumer to begin</div>
+          <div className="text-base font-bold text-slate-900">{t("Choose a consumer to begin")}</div>
           <p className="text-sm text-slate-500">
             {openJobs.length > 0
-              ? `You have ${openJobs.length} open job${openJobs.length === 1 ? '' : 's'}. Pick one from the list above.`
-              : 'You have no open jobs right now. Ask the office to assign work to you.'}
+              ? openJobs.length === 1
+                ? t('You have 1 open job. Pick it from the list above.')
+                : t('You have {n} open jobs. Pick one from the list above.', { n: openJobs.length })
+              : t("You have no open jobs right now. Ask the office to assign work to you.")}
           </p>
+          {waitingForSurvey > 0 && (
+            <p className="text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 inline-block">
+              {waitingForSurvey === 1
+                ? t('1 more home needs a site survey first. Open Site Survey in the menu.')
+                : t('{n} more homes need a site survey first. Open Site Survey in the menu.', { n: waitingForSurvey })}
+            </p>
+          )}
         </div>
       ) : (
         <>
@@ -316,9 +327,9 @@ export const FieldSubmissionWebView: React.FC<{
           <div className="sm:hidden bg-white rounded-2xl border border-slate-200 p-4 space-y-2">
             <div className="flex justify-between items-baseline">
               <span className="text-lg font-bold text-slate-900">
-                Step {activeStep} of 7
+                {t('Step {n} of {total}', { n: activeStep, total: 7 })}
               </span>
-              <span className="text-sm text-slate-600">{STEP_TITLES[activeStep - 1]}</span>
+              <span className="text-sm text-slate-600">{t(STEP_TITLES[activeStep - 1])}</span>
             </div>
             <div className="h-3 bg-slate-200 rounded-full overflow-hidden">
               <div className="h-full bg-brand-600 rounded-full" style={{ width: `${(activeStep / 7) * 100}%` }} />
@@ -347,9 +358,9 @@ export const FieldSubmissionWebView: React.FC<{
                       : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                   }`}
                 >
-                  <div className="text-xs font-bold">Step {stepNum}</div>
-                  <div className="text-sm">{title}</div>
-                  <div className="text-xs mt-0.5 opacity-80">{isDone ? '✓ Done' : isCurrent ? 'You are here' : 'To do'}</div>
+                  <div className="text-xs font-bold">{t('Step {n}', { n: stepNum })}</div>
+                  <div className="text-sm">{t(title)}</div>
+                  <div className="text-xs mt-0.5 opacity-80">{isDone ? t("✓ Done") : isCurrent ? t("You are here") : t("To do")}</div>
                 </button>
               );
             })}
@@ -373,9 +384,7 @@ export const FieldSubmissionWebView: React.FC<{
                 )}
                 <span>{validationAlert.text}</span>
               </div>
-              <button onClick={() => setValidationAlert(null)} className="text-sm font-bold underline">
-                OK
-              </button>
+              <button onClick={() => setValidationAlert(null)} className="text-sm font-bold underline">{t("OK")}</button>
             </div>
           )}
 
@@ -383,32 +392,32 @@ export const FieldSubmissionWebView: React.FC<{
             {/* STEP 1 */}
             {activeStep === 1 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-bold text-slate-900">Step 1 — Is this the right home?</h3>
+                <h3 className="text-lg font-bold text-slate-900">{t("Step 1 — Is this the right home?")}</h3>
                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div>
-                    <span className="text-slate-500">Consumer number</span>
+                    <span className="text-slate-500">{t("Consumer number")}</span>
                     <div className="font-mono font-bold text-slate-900 mt-0.5">{currentConsumer?.consumerNumber}</div>
                   </div>
                   <div>
-                    <span className="text-slate-500">Name</span>
+                    <span className="text-slate-500">{t("Name")}</span>
                     <div className="font-bold text-slate-900 mt-0.5">{currentConsumer?.name}</div>
                   </div>
                   <div>
-                    <span className="text-slate-500">Village</span>
+                    <span className="text-slate-500">{t("Village")}</span>
                     <div className="font-semibold text-slate-800 mt-0.5">
                       {currentConsumer?.village}, {currentConsumer?.mandal}
                     </div>
                   </div>
                   <div>
-                    <span className="text-slate-500">System size</span>
+                    <span className="text-slate-500">{t("System size")}</span>
                     <div className="font-bold text-brand-600 mt-0.5">
-                      {currentConsumer?.capacityKw} kW (4 panels + 1 inverter)
+                      {t('{kw} kW (4 panels + 1 inverter)', { kw: currentConsumer?.capacityKw })}
                     </div>
                   </div>
                 </div>
                 <div className="flex justify-end pt-4">
                   <button onClick={() => goTo(2)} className={btnPrimary}>
-                    <span>Yes, continue</span>
+                    <span>{t("Yes, continue")}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -418,10 +427,8 @@ export const FieldSubmissionWebView: React.FC<{
             {/* STEP 2 */}
             {activeStep === 2 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-bold text-slate-900">Step 2 — Check the details with the consumer</h3>
-                <p className="text-sm text-slate-500">
-                  Read these out to the consumer. If something is wrong, tell the office. You cannot change it here.
-                </p>
+                <h3 className="text-lg font-bold text-slate-900">{t("Step 2 — Check the details with the consumer")}</h3>
+                <p className="text-sm text-slate-500">{t("Read these out to the consumer. If something is wrong, tell the office. You cannot change it here.")}</p>
                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-sm max-w-xl">
                   {[
                     ['Name', currentConsumer?.name],
@@ -430,15 +437,13 @@ export const FieldSubmissionWebView: React.FC<{
                     ['Division', currentConsumer?.division],
                   ].map(([label, value]) => (
                     <div key={label} className="flex justify-between gap-4 py-2 border-b border-slate-200 last:border-0">
-                      <span className="text-slate-500">{label}</span>
+                      <span className="text-slate-500">{t(label as string)}</span>
                       <span className="font-semibold text-slate-900 text-right">{value}</span>
                     </div>
                   ))}
                 </div>
                 <div className="flex justify-between pt-4">
-                  <button onClick={() => goTo(1)} className={btnBack}>
-                    Back
-                  </button>
+                  <button onClick={() => goTo(1)} className={btnBack}>{t("Back")}</button>
                   <button
                     onClick={() => {
                       updateDraft({ consumerConfirmed: true });
@@ -446,7 +451,7 @@ export const FieldSubmissionWebView: React.FC<{
                     }}
                     className={btnPrimary}
                   >
-                    <span>Details are correct</span>
+                    <span>{t("Details are correct")}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -458,13 +463,11 @@ export const FieldSubmissionWebView: React.FC<{
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-3">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900">Step 3 — Scan the 4 panels</h3>
-                    <p className="text-sm text-slate-500">
-                      Type the number from each panel&apos;s label, or tap the stock number below it.
-                    </p>
+                    <h3 className="text-lg font-bold text-slate-900">{t("Step 3 — Scan the 4 panels")}</h3>
+                    <p className="text-sm text-slate-500">{t("Type the number from each panel's label, or tap the stock number below it.")}</p>
                   </div>
                   <span className="self-start sm:self-auto text-sm font-bold bg-brand-50 text-brand-700 px-3 py-1 rounded-full whitespace-nowrap">
-                    {panelsDone(installerDraft)} of 4 done
+                    {t('{n} of {total} done', { n: panelsDone(installerDraft), total: 4 })}
                   </span>
                 </div>
 
@@ -479,11 +482,11 @@ export const FieldSubmissionWebView: React.FC<{
                         }`}
                       >
                         <div className="flex justify-between items-center text-sm">
-                          <span className="font-bold text-slate-800">Panel {idx + 1}</span>
+                          <span className="font-bold text-slate-800">{t('Panel {n}', { n: idx + 1 })}</span>
                           {serial ? (
-                            <span className="text-emerald-700 font-bold">✓ Saved</span>
+                            <span className="text-emerald-700 font-bold">{t("✓ Saved")}</span>
                           ) : (
-                            <span className="text-slate-400">To do</span>
+                            <span className="text-slate-400">{t("To do")}</span>
                           )}
                         </div>
 
@@ -504,13 +507,11 @@ export const FieldSubmissionWebView: React.FC<{
                               onChange={(e) =>
                                 setPanelInput((prev) => prev.map((v, i) => (i === idx ? e.target.value.toUpperCase() : v)))
                               }
-                              placeholder="Panel number"
-                              aria-label={`Panel ${idx + 1} number`}
+                              placeholder={t("Panel number")}
+                              aria-label={t("Panel {n} number", { n: idx + 1 })}
                               className="flex-1 min-w-0 px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-mono"
                             />
-                            <button type="submit" className="px-3 py-2.5 bg-brand-600 text-white rounded-lg text-sm font-bold">
-                              Save
-                            </button>
+                            <button type="submit" className="px-3 py-2.5 bg-brand-600 text-white rounded-lg text-sm font-bold">{t("Save")}</button>
                           </form>
                         )}
 
@@ -518,9 +519,9 @@ export const FieldSubmissionWebView: React.FC<{
                           <button
                             onClick={() => handleScanPanel(idx, `SP-540W-26030${idx + 1}`)}
                             className="w-full text-left font-mono text-xs bg-white hover:bg-brand-50 p-2 rounded border border-slate-200 text-slate-700 font-semibold"
-                            title="Demo: pick an available panel from stock"
+                            title={t("Demo: pick an available panel from stock")}
                           >
-                            Demo stock: SP-540W-26030{idx + 1}
+                            {t('Demo stock:')} SP-540W-26030{idx + 1}
                           </button>
                         )}
                       </div>
@@ -535,7 +536,7 @@ export const FieldSubmissionWebView: React.FC<{
             {/* STEP 4 */}
             {activeStep === 4 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-bold text-slate-900">Step 4 — Scan the inverter</h3>
+                <h3 className="text-lg font-bold text-slate-900">{t("Step 4 — Scan the inverter")}</h3>
 
                 <div className="max-w-md p-5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
                   {installerDraft.inverterSerial ? (
@@ -554,18 +555,16 @@ export const FieldSubmissionWebView: React.FC<{
                       <input
                         value={inverterInput}
                         onChange={(e) => setInverterInput(e.target.value.toUpperCase())}
-                        placeholder="Inverter number from the label"
-                        aria-label="Inverter number"
+                        placeholder={t("Inverter number from the label")}
+                        aria-label={t("Inverter number")}
                         className="flex-1 min-w-0 px-3 py-3 bg-white border border-slate-300 rounded-lg text-sm font-mono"
                       />
-                      <button type="submit" className="px-4 py-3 bg-brand-600 text-white rounded-lg text-sm font-bold">
-                        Save
-                      </button>
+                      <button type="submit" className="px-4 py-3 bg-brand-600 text-white rounded-lg text-sm font-bold">{t("Save")}</button>
                     </form>
                   )}
 
                   <div className="pt-1">
-                    <div className="text-xs text-slate-500 font-bold mb-1.5">Demo stock:</div>
+                    <div className="text-xs text-slate-500 font-bold mb-1.5">{t("Demo stock:")}</div>
                     <div className="flex gap-2">
                       {['INV-3.3KW-9003', 'INV-3.3KW-9004'].map((sn) => (
                         <button
@@ -589,11 +588,11 @@ export const FieldSubmissionWebView: React.FC<{
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-3">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900">Step 5 — Take 7 photos</h3>
-                    <p className="text-sm text-slate-500">Take each photo as shown. All 7 are needed for the subsidy.</p>
+                    <h3 className="text-lg font-bold text-slate-900">{t("Step 5 — Take 7 photos")}</h3>
+                    <p className="text-sm text-slate-500">{t("Take each photo as shown. All 7 are needed for the subsidy.")}</p>
                   </div>
                   <span className="self-start sm:self-auto text-sm font-bold bg-brand-50 text-brand-700 px-3 py-1 rounded-full whitespace-nowrap">
-                    {photosDone(installerDraft)} of 7 done
+                    {t('{n} of {total} done', { n: photosDone(installerDraft), total: 7 })}
                   </span>
                 </div>
 
@@ -612,35 +611,29 @@ export const FieldSubmissionWebView: React.FC<{
                           {photo ? (
                             <>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={photo.url} alt={guide.title} className="w-full h-full object-cover" />
-                              <span className="absolute bottom-2 right-2 bg-emerald-600 text-white text-xs font-bold px-2 py-0.5 rounded">
-                                ✓ Done
-                              </span>
+                              <img src={photo.url} alt={t(guide.title)} className="w-full h-full object-cover" />
+                              <span className="absolute bottom-2 right-2 bg-emerald-600 text-white text-xs font-bold px-2 py-0.5 rounded">{t("✓ Done")}</span>
                             </>
                           ) : (
                             <div className="text-center p-3 text-slate-400">
                               <Camera className="w-8 h-8 mx-auto mb-1 opacity-50" />
-                              <span className="text-sm font-semibold">Photo needed</span>
+                              <span className="text-sm font-semibold">{t("Photo needed")}</span>
                             </div>
                           )}
                         </div>
                         <div className="p-3 space-y-2">
-                          <div className="text-sm font-bold text-slate-900">{guide.title}</div>
-                          <p className="text-sm text-slate-500">{guide.hint}</p>
+                          <div className="text-sm font-bold text-slate-900">{t(guide.title)}</div>
+                          <p className="text-sm text-slate-500">{t(guide.hint)}</p>
                           {photo ? (
                             <button
                               onClick={() => removePhotoFromDraft(cat)}
                               className="w-full py-2.5 border border-slate-300 hover:bg-slate-100 rounded-lg text-sm font-semibold text-slate-600"
-                            >
-                              Take again
-                            </button>
+                            >{t("Take again")}</button>
                           ) : (
                             <button
                               onClick={() => handleAttachPhoto(cat)}
                               className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-bold shadow-sm"
-                            >
-                              Take photo
-                            </button>
+                            >{t("Take photo")}</button>
                           )}
                         </div>
                       </div>
@@ -655,8 +648,8 @@ export const FieldSubmissionWebView: React.FC<{
             {/* STEP 6 */}
             {activeStep === 6 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-bold text-slate-900">Step 6 — Capture the location</h3>
-                <p className="text-sm text-slate-500">Stand near the panels, outside if you can, then tap the button.</p>
+                <h3 className="text-lg font-bold text-slate-900">{t("Step 6 — Capture the location")}</h3>
+                <p className="text-sm text-slate-500">{t("Stand near the panels, outside if you can, then tap the button.")}</p>
 
                 <div className="max-w-md p-5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
                   {installerDraft.gps ? (
@@ -664,25 +657,21 @@ export const FieldSubmissionWebView: React.FC<{
                       <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-900 flex items-center gap-2">
                         <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                         <div>
-                          <div className="font-bold">Location saved</div>
+                          <div className="font-bold">{t("Location saved")}</div>
                           <div className="text-emerald-700">
-                            {installerDraft.gps.address} · accurate to {installerDraft.gps.accuracy} m
+                            {installerDraft.gps.address} · {t('accurate to {m} m', { m: installerDraft.gps.accuracy })}
                           </div>
                         </div>
                       </div>
                       <button
                         onClick={handleSimulateGps}
                         className="w-full py-2.5 border border-slate-300 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                      >
-                        Capture again
-                      </button>
+                      >{t("Capture again")}</button>
                     </div>
                   ) : (
                     <div className="text-center py-6 space-y-3">
                       <MapPin className="w-10 h-10 text-brand-600 mx-auto" />
-                      <button onClick={handleSimulateGps} className={btnPrimary + ' mx-auto'}>
-                        Capture location now
-                      </button>
+                      <button onClick={handleSimulateGps} className={btnPrimary + ' mx-auto'}>{t("Capture location now")}</button>
                     </div>
                   )}
                 </div>
@@ -694,22 +683,22 @@ export const FieldSubmissionWebView: React.FC<{
             {/* STEP 7 */}
             {activeStep === 7 &&
               (() => {
-                const missing = missingItems(installerDraft);
+                const missing = missingItems(installerDraft, t);
                 const rows: [string, string, boolean][] = [
                   ['Consumer', `${currentConsumer?.name} (${currentConsumer?.consumerNumber})`, installerDraft.consumerConfirmed],
-                  ['Panels', `${panelsDone(installerDraft)} of 4`, panelsDone(installerDraft) === 4],
-                  ['Inverter', installerDraft.inverterSerial || 'Not scanned', !!installerDraft.inverterSerial],
-                  ['Photos', `${photosDone(installerDraft)} of 7`, photosDone(installerDraft) === 7],
-                  ['Location', installerDraft.gps ? 'Saved' : 'Not captured', !!installerDraft.gps],
+                  ['Panels', t('{n} of {total}', { n: panelsDone(installerDraft), total: 4 }), panelsDone(installerDraft) === 4],
+                  ['Inverter', installerDraft.inverterSerial || t('Not scanned'), !!installerDraft.inverterSerial],
+                  ['Photos', t('{n} of {total}', { n: photosDone(installerDraft), total: 7 }), photosDone(installerDraft) === 7],
+                  ['Location', installerDraft.gps ? t('Saved') : t('Not captured'), !!installerDraft.gps],
                 ];
                 return (
                   <div className="space-y-4">
-                    <h3 className="text-lg font-bold text-slate-900">Step 7 — Check everything and send</h3>
+                    <h3 className="text-lg font-bold text-slate-900">{t("Step 7 — Check everything and send")}</h3>
 
                     <div className="p-5 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-sm max-w-lg">
                       {rows.map(([label, value, ok]) => (
                         <div key={label} className="flex justify-between gap-4 py-2 border-b border-slate-200 last:border-0">
-                          <span className="text-slate-600">{label}</span>
+                          <span className="text-slate-600">{t(label)}</span>
                           <span className={`font-bold flex items-center gap-1.5 ${ok ? 'text-emerald-700' : 'text-red-700'}`}>
                             {ok ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
                             {value}
@@ -720,7 +709,7 @@ export const FieldSubmissionWebView: React.FC<{
 
                     {missing.length > 0 && (
                       <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-900 max-w-lg">
-                        <div className="font-bold mb-1">Before you can send, please finish:</div>
+                        <div className="font-bold mb-1">{t("Before you can send, please finish:")}</div>
                         <ul className="list-disc pl-5 space-y-0.5">
                           {missing.map((m) => (
                             <li key={m}>{m}</li>
@@ -730,16 +719,14 @@ export const FieldSubmissionWebView: React.FC<{
                     )}
 
                     <div className="flex justify-between pt-4">
-                      <button onClick={() => goTo(6)} className={btnBack}>
-                        Back
-                      </button>
+                      <button onClick={() => goTo(6)} className={btnBack}>{t("Back")}</button>
                       <button
                         onClick={handleSubmitFinal}
                         disabled={missing.length > 0}
                         className={btnPrimary.replace('bg-brand-600 hover:bg-brand-700', 'bg-emerald-600 hover:bg-emerald-700')}
                       >
                         <Send className="w-4 h-4" />
-                        <span>Send installation</span>
+                        <span>{t("Send installation")}</span>
                       </button>
                     </div>
                   </div>

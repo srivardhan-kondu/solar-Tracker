@@ -7,6 +7,7 @@ import {
   ServiceTicket,
   ActionRequiredException,
   AuditEvent,
+  SiteSurvey,
 } from '@/types';
 
 export const SEED_USERS: User[] = [
@@ -495,4 +496,38 @@ export const SEED_AUDIT_LOGS: AuditEvent[] = [
     timestamp: '2026-11-23 02:15 PM',
     details: 'Blocked attempt by installer Ramesh Kumar to scan already installed serial SP-540W-260101 against AP-GNT-2026-004.',
   },
+];
+
+// Site surveys already done for homes whose installation has started.
+// AP-GNT-2026-003 and -005 have no survey yet, so they show up on the installer's Survey screen.
+const sampleSurvey = (
+  consumerNumber: string,
+  surveyorId: string,
+  surveyorName: string,
+  date: string,
+  roofType: SiteSurvey['roofType'],
+  shadeLevel: SiteSurvey['shadeLevel'],
+  shadeSources: string[]
+): SiteSurvey => ({
+  id: `svy_${consumerNumber}`,
+  consumerNumber,
+  surveyorId,
+  surveyorName,
+  status: 'Submitted',
+  startedAt: `${date} 09:30 AM`,
+  submittedAt: `${date} 10:05 AM`,
+  billPhoto: { id: `svb_${consumerNumber}`, url: '/samples/bill.svg', capturedAt: `${date} 09:35 AM` },
+  aadhaarPhoto: { id: `sva_${consumerNumber}`, url: '/samples/aadhaar.svg', capturedAt: `${date} 09:37 AM` },
+  roofType,
+  roofPhotos: [{ id: `svr_${consumerNumber}`, url: '/samples/roof.svg', capturedAt: `${date} 09:45 AM` }],
+  shadeLevel,
+  shadeSources,
+  surroundingsPhotos: [{ id: `svs_${consumerNumber}`, url: '/samples/surroundings.svg', capturedAt: `${date} 09:55 AM` }],
+  decision: 'Feasible',
+});
+
+export const SEED_SURVEYS: SiteSurvey[] = [
+  sampleSurvey('AP-GNT-2026-001', 'usr_003', 'Ramesh Kumar', '18 Nov 2026', 'Concrete', 'None', []),
+  sampleSurvey('AP-GNT-2026-002', 'usr_003', 'Ramesh Kumar', '19 Nov 2026', 'Concrete', 'Some', ['Trees']),
+  sampleSurvey('AP-GNT-2026-004', 'usr_003', 'Ramesh Kumar', '22 Nov 2026', 'Metal sheets', 'None', []),
 ];

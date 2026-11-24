@@ -1,26 +1,21 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Search, AlertTriangle, RotateCcw, ChevronDown, Check, X } from 'lucide-react';
+import { useLang } from '@/i18n/LanguageContext';
+import { Search, AlertTriangle, RotateCcw, ChevronDown, Check, X, Languages } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import { isOfficeRole } from '@/lib/access';
+import { isOfficeRole, ROLE_LABEL } from '@/lib/access';
 import { STATUS_LABEL } from '@/lib/status';
 import { Logo } from '@/components/brand/Logo';
 import { UserRole } from '@/types';
 
-/** Plain words for each role, shown to the person using the app */
-const ROLE_LABEL: Record<UserRole, string> = {
-  'Super Admin': 'Head office',
-  Admin: 'Office staff',
-  Installer: 'Installer',
-  'Service Engineer': 'Service engineer',
-};
 
 interface AppNavbarProps {
   onNavigateToTab?: (tab: string) => void;
 }
 
 export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
+  const { t, lang, toggleLang } = useLang();
   const { currentUser, setCurrentUser, users, exceptions, consumers, setSelectedConsumerFor360, resetAllData } =
     useApp();
 
@@ -81,8 +76,8 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
               onFocus={() => setShowSearchResults(true)}
               onKeyDown={(e) => e.key === 'Escape' && setShowSearchResults(false)}
               onBlur={() => setTimeout(() => setShowSearchResults(false), 150)}
-              placeholder="Find a consumer by name, village or phone"
-              aria-label="Find a consumer"
+              placeholder={t("Find a consumer by name, village or phone")}
+              aria-label={t("Find a consumer")}
               className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-slate-300 rounded-xl text-base text-slate-900 focus:outline-none focus:border-brand-600 focus:bg-white"
             />
 
@@ -107,13 +102,11 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
                           {c.village} · {c.consumerNumber}
                         </div>
                       </div>
-                      <span className="text-sm font-bold text-brand-700 whitespace-nowrap">{STATUS_LABEL[c.status]}</span>
+                      <span className="text-sm font-bold text-brand-700 whitespace-nowrap">{t(STATUS_LABEL[c.status])}</span>
                     </button>
                   ))
                 ) : (
-                  <div className="p-4 text-base text-slate-600 text-center">
-                    No one found. Try part of the name or village.
-                  </div>
+                  <div className="p-4 text-base text-slate-600 text-center">{t("No one found. Try part of the name or village.")}</div>
                 )}
               </div>
             )}
@@ -129,10 +122,10 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
                     ? 'border-red-200 bg-red-50 text-red-800 hover:bg-red-100'
                     : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
-                aria-label={`Problems to fix: ${openExceptionsCount}`}
+                aria-label={t('Problems to fix: {n}', { n: openExceptionsCount })}
               >
                 <AlertTriangle className="w-5 h-5" />
-                <span className="hidden md:inline">Problems</span>
+                <span className="hidden md:inline">{t("Problems")}</span>
                 <span
                   className={`min-w-[28px] h-7 px-1.5 rounded-full flex items-center justify-center text-sm ${
                     openExceptionsCount > 0 ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-700'
@@ -143,21 +136,33 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
               </button>
             )}
 
+            {/* Language switch: shows the OTHER language, written in that language */}
+            <button
+              onClick={toggleLang}
+              lang={lang === 'en' ? 'te' : 'en'}
+              title={lang === 'en' ? 'తెలుగులో చూడండి (View in Telugu)' : 'View in English (ఆంగ్లంలో చూడండి)'}
+              aria-label={lang === 'en' ? 'Switch to Telugu – తెలుగు' : 'Switch to English – ఇంగ్లీష్'}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 rounded-xl border-2 border-brand-200 bg-brand-50 text-brand-800 hover:bg-brand-100 font-bold text-base whitespace-nowrap"
+            >
+              <Languages className="w-5 h-5 flex-shrink-0" />
+              <span>{lang === 'en' ? 'తెలుగు' : 'English'}</span>
+            </button>
+
             {/* Reset demo data — Super Admin only */}
             {currentUser.role === 'Super Admin' && (
               <button
                 onClick={() => {
                   if (
-                    window.confirm('This deletes ALL changes and puts back the demo data. This cannot be undone. Continue?')
+                    window.confirm(t('This deletes ALL changes and puts back the demo data. This cannot be undone. Continue?'))
                   ) {
                     resetAllData();
                   }
                 }}
                 className="hidden sm:flex items-center gap-2 px-3 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                title="Reset demo data"
+                title={t("Reset demo data")}
               >
                 <RotateCcw className="w-5 h-5" />
-                <span className="hidden xl:inline text-sm font-semibold">Reset demo</span>
+                <span className="hidden xl:inline text-sm font-semibold">{t("Reset demo")}</span>
               </button>
             )}
 
@@ -167,14 +172,14 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
                 onClick={() => setShowRoleMenu(!showRoleMenu)}
                 aria-haspopup="menu"
                 aria-expanded={showRoleMenu}
-                aria-label={`Signed in as ${currentUser.name}. Switch user`}
+                aria-label={t('Signed in as {name}. Switch user', { name: currentUser.name })}
                 className="flex items-center gap-3 p-1 sm:py-1.5 sm:pl-1.5 sm:pr-3 bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-xl"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={currentUser.avatar} alt="" className="w-10 h-10 rounded-lg object-cover" />
                 <div className="text-left hidden xl:block leading-tight">
                   <div className="text-base font-bold text-slate-900">{currentUser.name}</div>
-                  <div className="text-sm text-slate-600">{ROLE_LABEL[currentUser.role]}</div>
+                  <div className="text-sm text-slate-600">{t(ROLE_LABEL[currentUser.role])}</div>
                 </div>
                 <ChevronDown className="w-5 h-5 text-slate-600 hidden sm:block" />
               </button>
@@ -185,10 +190,10 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
                   className="absolute right-0 mt-2 w-[min(20rem,calc(100vw-2rem))] bg-white rounded-xl shadow-2xl border-2 border-slate-200 py-2 z-50"
                 >
                   <div className="px-4 py-2 flex items-center justify-between">
-                    <span className="text-base font-bold text-slate-900">Switch user</span>
+                    <span className="text-base font-bold text-slate-900">{t("Switch user")}</span>
                     <button
                       onClick={() => setShowRoleMenu(false)}
-                      aria-label="Close"
+                      aria-label={t("Close")}
                       className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"
                     >
                       <X className="w-5 h-5" />
@@ -213,7 +218,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
                         <div className="flex-1">
                           <div className="text-base font-bold text-slate-900">{u.name}</div>
                           <div className="text-sm text-slate-600">
-                            {ROLE_LABEL[u.role]} · {u.division}
+                            {t(ROLE_LABEL[u.role])} · {u.division}
                           </div>
                         </div>
                         {active && <Check className="w-6 h-6 text-brand-600" />}

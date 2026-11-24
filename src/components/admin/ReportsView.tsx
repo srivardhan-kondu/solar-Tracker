@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useLang } from '@/i18n/LanguageContext';
 import {
   FileText,
   Download,
@@ -16,6 +17,7 @@ import { useApp } from '@/context/AppContext';
 import * as XLSX from 'xlsx';
 
 export const ReportsView: React.FC = () => {
+  const { t } = useLang();
   const { consumers, installations, dcrRecords, exceptions, inventory, users } = useApp();
 
   const [activeReport, setActiveReport] = useState<string>('daily_installation');
@@ -195,10 +197,8 @@ export const ReportsView: React.FC = () => {
       {/* Header */}
       <div className="no-print bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Reports</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Pick a report below. You can print it or download it as Excel.
-          </p>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t("Reports")}</h1>
+          <p className="text-sm text-slate-500 mt-0.5">{t("Pick a report below. You can print it or download it as Excel.")}</p>
         </div>
 
         <div className="grid grid-cols-2 gap-2 w-full xl:w-auto xl:flex xl:items-center">
@@ -207,7 +207,7 @@ export const ReportsView: React.FC = () => {
             className="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors"
           >
             <Printer className="w-4 h-4 text-slate-600" />
-            <span>Print Report</span>
+            <span>{t("Print Report")}</span>
           </button>
           <button
             onClick={handleExportXLSX}
@@ -215,7 +215,7 @@ export const ReportsView: React.FC = () => {
             className="disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-colors"
           >
             <Download className="w-4 h-4" />
-            <span>Export Excel (.xlsx)</span>
+            <span>{t("Export Excel (.xlsx)")}</span>
           </button>
         </div>
       </div>
@@ -232,7 +232,7 @@ export const ReportsView: React.FC = () => {
                 : 'bg-white text-slate-700 border-slate-200 hover:border-brand-300 hover:bg-brand-50/50'
             }`}
           >
-            <div className="text-xs line-clamp-2">{r.title}</div>
+            <div className="text-xs line-clamp-2">{t(r.title)}</div>
           </button>
         ))}
       </div>
@@ -241,21 +241,21 @@ export const ReportsView: React.FC = () => {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-4">
         <div className="border-b border-slate-200 pb-4 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-2">
           <div>
-            <div className="text-sm font-bold text-brand-700">Solar Tracker</div>
+            <div className="text-sm font-bold text-brand-700">{t("Solar Tracker")}</div>
             <h2 className="text-lg font-bold text-slate-900 mt-0.5">
-              {reportList.find((r) => r.id === activeReport)?.title}
+              {t(reportList.find((r) => r.id === activeReport)?.title || '')}
             </h2>
             <div className="text-sm text-slate-500 mt-1">
-              Made on {new Date().toLocaleString('en-IN')} · covers all records
+              {t('Made on {when} · covers all records', { when: new Date().toLocaleString('en-IN') })}
             </div>
           </div>
           <div className="text-sm font-bold text-slate-700">
-            {reportData.length} {reportData.length === 1 ? 'row' : 'rows'}
+            {reportData.length} {reportData.length === 1 ? t("row") : t("rows")}
           </div>
         </div>
 
         {reportData.length === 0 && (
-          <div className="py-10 text-center text-base text-slate-600">Nothing to show in this report right now.</div>
+          <div className="py-10 text-center text-base text-slate-600">{t("Nothing to show in this report right now.")}</div>
         )}
 
         {/* Smaller screens: one card per row, every column labelled */}
@@ -266,7 +266,7 @@ export const ReportsView: React.FC = () => {
               <dl className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
                 {columns.slice(1).map((c) => (
                   <div key={c} className="min-w-0">
-                    <dt className="text-slate-500">{c}</dt>
+                    <dt className="text-slate-500">{t(c)}</dt>
                     <dd className="font-semibold text-slate-900 break-words">{String(row[c] ?? '') || '—'}</dd>
                   </div>
                 ))}
@@ -283,7 +283,7 @@ export const ReportsView: React.FC = () => {
                 <tr>
                   {columns.map((c) => (
                     <th key={c} className="py-3 px-3.5">
-                      {c}
+                      {t(c)}
                     </th>
                   ))}
                 </tr>

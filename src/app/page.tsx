@@ -14,6 +14,7 @@ import { ActionRequiredView } from '@/components/admin/ActionRequiredView';
 import { ReportsView } from '@/components/admin/ReportsView';
 import { ServiceTicketsAdminView } from '@/components/admin/ServiceTicketsAdminView';
 import { FieldSubmissionWebView } from '@/components/admin/FieldSubmissionWebView';
+import { SurveyView } from '@/components/admin/SurveyView';
 import { UserManagementView } from '@/components/admin/UserManagementView';
 import { AuditLogView } from '@/components/admin/AuditLogView';
 import { Consumer360Modal } from '@/components/admin/Consumer360Modal';
@@ -57,6 +58,8 @@ export default function Home() {
         {/* Content Pane */}
         <main className="flex-1 min-w-0 p-4 pb-32 sm:p-6 sm:pb-32 lg:pb-6 overflow-y-auto">
           {show('dashboard') && <DashboardView onNavigateToTab={navigate} />}
+
+          {show('survey') && <SurveyView onGoToInstallation={() => navigate('field_portal')} />}
 
           {show('field_portal') && <FieldSubmissionWebView onFinished={() => navigate('installations')} />}
 

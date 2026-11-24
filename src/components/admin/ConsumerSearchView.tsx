@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import { useLang } from '@/i18n/LanguageContext';
 import {
   Search,
   Filter,
@@ -24,12 +25,24 @@ import {
   statusBadgeClass,
   uniqueSorted,
 } from '@/lib/status';
+import { needsSurvey, surveyFor } from '@/lib/survey';
 
 export const ConsumerSearchView: React.FC<{
   onSelectConsumer: (consumer: Consumer) => void;
   initialStatusFilter?: string;
 }> = ({ onSelectConsumer, initialStatusFilter = 'All' }) => {
-  const { consumers, installations } = useApp();
+  const { t } = useLang();
+  const { consumers, installations, surveys } = useApp();
+
+  // Survey result for homes not yet installed
+  const surveyNote = (c: Consumer) => {
+    const s = surveyFor(surveys, c.consumerNumber);
+    if (s?.status === 'Submitted' && s.decision === 'Not Feasible')
+      return <span className="inline-block px-3 py-1 rounded-full font-bold text-sm bg-red-100 text-red-800">{t('Site not feasible')}</span>;
+    if (needsSurvey(c, surveys, installations))
+      return <span className="text-sm text-slate-500">{t('Waiting for site survey')}</span>;
+    return null;
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
@@ -96,10 +109,8 @@ export const ConsumerSearchView: React.FC<{
       {/* Header */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Find a Consumer</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Search by name, village, mobile or consumer number. Click &quot;Open&quot; to see photos and details.
-          </p>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t("Find a Consumer")}</h1>
+          <p className="text-sm text-slate-500 mt-0.5">{t("Search by name, village, mobile or consumer number. Click \"Open\" to see photos and details.")}</p>
         </div>
 
         <button
@@ -107,7 +118,7 @@ export const ConsumerSearchView: React.FC<{
           className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-colors"
         >
           <Download className="w-4 h-4" />
-          <span>Download as Excel ({filteredConsumers.length})</span>
+          <span>{t('Download as Excel ({n})', { n: filteredConsumers.length })}</span>
         </button>
       </div>
 
@@ -119,8 +130,8 @@ export const ConsumerSearchView: React.FC<{
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Type a name, village, mobile or consumer number"
-            aria-label="Search consumers"
+            placeholder={t("Type a name, village, mobile or consumer number")}
+            aria-label={t("Search consumers")}
             className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white"
           />
         </div>
@@ -129,21 +140,21 @@ export const ConsumerSearchView: React.FC<{
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            aria-label="Filter by status"
+            aria-label={t("Filter by status")}
             className="text-sm font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-700"
           >
-            <option value="All">All statuses</option>
+            <option value="All">{t("All statuses")}</option>
             <optgroup label="Groups">
               {(Object.keys(STATUS_GROUPS) as StatusGroupKey[]).map((k) => (
                 <option key={k} value={`group:${k}`}>
-                  {STATUS_GROUPS[k].label}
+                  {t(STATUS_GROUPS[k].label)}
                 </option>
               ))}
             </optgroup>
             <optgroup label="Exact status">
               {ALL_STATUSES.map((st) => (
                 <option key={st} value={st}>
-                  {STATUS_LABEL[st]}
+                  {t(STATUS_LABEL[st])}
                 </option>
               ))}
             </optgroup>
@@ -152,10 +163,10 @@ export const ConsumerSearchView: React.FC<{
           <select
             value={divisionFilter}
             onChange={(e) => setDivisionFilter(e.target.value)}
-            aria-label="Filter by division"
+            aria-label={t("Filter by division")}
             className="text-sm font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-700"
           >
-            <option value="All">All divisions</option>
+            <option value="All">{t("All divisions")}</option>
             {divisions.map((d) => (
               <option key={d} value={d}>
                 {d}
@@ -168,8 +179,7 @@ export const ConsumerSearchView: React.FC<{
       {/* Records Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {filteredConsumers.length === 0 && (
-          <div className="xl:hidden p-8 text-center text-base text-slate-600">
-            No consumers match.{' '}
+          <div className="xl:hidden p-8 text-center text-base text-slate-600">{t("No consumers match.")}{' '}
             <button
               onClick={() => {
                 setSearchQuery('');
@@ -177,9 +187,7 @@ export const ConsumerSearchView: React.FC<{
                 setDivisionFilter('All');
               }}
               className="font-bold text-brand-700 underline"
-            >
-              Clear search and filters
-            </button>
+            >{t("Clear search and filters")}</button>
           </div>
         )}
         {/* Phones, tablets and small laptops: one easy card per consumer */}
@@ -193,19 +201,22 @@ export const ConsumerSearchView: React.FC<{
                     <div className="text-lg font-bold text-slate-900">{c.name}</div>
                     <div className="font-mono text-sm text-slate-700">{c.consumerNumber}</div>
                   </div>
-                  <span className={`px-3 py-1 rounded-full font-bold text-sm ${statusBadgeClass(c.status)}`}>
-                    {STATUS_LABEL[c.status]}
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`px-3 py-1 rounded-full font-bold text-sm ${statusBadgeClass(c.status)}`}>
+                      {t(STATUS_LABEL[c.status])}
+                    </span>
+                    {surveyNote(c)}
+                  </div>
                 </div>
                 <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
-                  <div><dt className="inline text-slate-500">Village: </dt><dd className="inline text-slate-900">{c.village}, {c.division}</dd></div>
-                  <div><dt className="inline text-slate-500">Installer: </dt><dd className="inline text-slate-900">{c.assignedInstallerName || 'Not assigned'}</dd></div>
-                  <div><dt className="inline text-slate-500">Mobile: </dt><dd className="inline text-slate-900">{c.mobile}</dd></div>
-                  <div className="break-all"><dt className="inline text-slate-500">ULA: </dt><dd className="inline font-mono text-slate-900">{c.ula}</dd></div>
+                  <div><dt className="inline text-slate-500">{t("Village:")}{" "}</dt><dd className="inline text-slate-900">{c.village}, {c.division}</dd></div>
+                  <div><dt className="inline text-slate-500">{t("Installer:")}{" "}</dt><dd className="inline text-slate-900">{c.assignedInstallerName || t("Not assigned")}</dd></div>
+                  <div><dt className="inline text-slate-500">{t("Mobile:")}{" "}</dt><dd className="inline text-slate-900">{c.mobile}</dd></div>
+                  <div className="break-all"><dt className="inline text-slate-500">{t("ULA:")}{" "}</dt><dd className="inline font-mono text-slate-900">{c.ula}</dd></div>
                   <div className="sm:col-span-2 break-all">
-                    <dt className="inline text-slate-500">DCR: </dt>
+                    <dt className="inline text-slate-500">{t("DCR:")}{" "}</dt>
                     <dd className={`inline ${inst?.dcrNumber ? 'font-mono font-bold text-emerald-700' : 'text-slate-600'}`}>
-                      {inst?.dcrNumber || 'Not received'}
+                      {inst?.dcrNumber || t("Not received")}
                     </dd>
                   </div>
                 </dl>
@@ -213,9 +224,7 @@ export const ConsumerSearchView: React.FC<{
                   onClick={() => onSelectConsumer(c)}
                   className="w-full sm:w-auto px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-base inline-flex items-center justify-center gap-2"
                 >
-                  <Eye className="w-5 h-5" />
-                  Open details
-                </button>
+                  <Eye className="w-5 h-5" />{t("Open details")}</button>
               </li>
             );
           })}
@@ -225,12 +234,12 @@ export const ConsumerSearchView: React.FC<{
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
               <tr>
-                <th className="py-3 px-4">Consumer</th>
-                <th className="py-3 px-4">Village</th>
-                <th className="py-3 px-4">Installer</th>
-                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4">{t("Consumer")}</th>
+                <th className="py-3 px-4">{t("Village")}</th>
+                <th className="py-3 px-4">{t("Installer")}</th>
+                <th className="py-3 px-4">{t("Status")}</th>
                 <th className="py-3 px-4 text-right">
-                  <span className="sr-only">Open</span>
+                  <span className="sr-only">{t("Open")}</span>
                 </th>
               </tr>
             </thead>
@@ -244,7 +253,7 @@ export const ConsumerSearchView: React.FC<{
                         <div className="text-base font-bold text-slate-900">{c.name}</div>
                         <div className="font-mono text-sm text-slate-700">{c.consumerNumber}</div>
                         <div className="text-sm text-slate-500">
-                          {c.mobile} · ULA <span className="font-mono">{c.ula}</span>
+                          {c.mobile} · {t('ULA')} <span className="font-mono">{c.ula}</span>
                         </div>
                       </td>
                       <td className="py-4 px-4">
@@ -252,32 +261,32 @@ export const ConsumerSearchView: React.FC<{
                         <div className="text-sm text-slate-500">{c.division}</div>
                       </td>
                       <td className="py-4 px-4 text-slate-800">
-                        {c.assignedInstallerName || <span className="text-amber-700 font-semibold">Not assigned</span>}
+                        {c.assignedInstallerName || <span className="text-amber-700 font-semibold">{t("Not assigned")}</span>}
                       </td>
                       <td className="py-4 px-4">
                         <span
                           className={`inline-block px-3 py-1 rounded-full font-bold text-sm whitespace-nowrap ${statusBadgeClass(c.status)}`}
                         >
-                          {STATUS_LABEL[c.status]}
+                          {t(STATUS_LABEL[c.status])}
                         </span>
+                        <div className="mt-1.5">{surveyNote(c)}</div>
                         <div className="text-sm mt-1.5">
                           {inst?.dcrNumber ? (
-                            <span className="text-emerald-700">
-                              DCR: <span className="font-mono font-bold">{inst.dcrNumber}</span>
+                            <span className="text-emerald-700">{t("DCR:")}{" "}<span className="font-mono font-bold">{inst.dcrNumber}</span>
                             </span>
                           ) : (
-                            <span className="text-slate-500">DCR not received</span>
+                            <span className="text-slate-500">{t("DCR not received")}</span>
                           )}
                         </div>
                       </td>
                       <td className="py-4 px-4 text-right">
                         <button
                           onClick={() => onSelectConsumer(c)}
-                          aria-label={`Open ${c.name}`}
+                          aria-label={t('Open {name}', { name: c.name })}
                           className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-base inline-flex items-center gap-2"
                         >
                           <Eye className="w-5 h-5" />
-                          <span>Open</span>
+                          <span>{t("Open")}</span>
                         </button>
                       </td>
                     </tr>
@@ -286,7 +295,7 @@ export const ConsumerSearchView: React.FC<{
               ) : (
                 <tr>
                   <td colSpan={5} className="py-10 text-center text-sm text-slate-500">
-                    No consumers match.{' '}
+                    {t('No consumers match.')}{' '}
                     {(q || statusFilter !== 'All' || divisionFilter !== 'All') && (
                       <button
                         onClick={() => {
@@ -295,9 +304,7 @@ export const ConsumerSearchView: React.FC<{
                           setDivisionFilter('All');
                         }}
                         className="font-bold text-brand-700 underline"
-                      >
-                        Clear search and filters
-                      </button>
+                      >{t("Clear search and filters")}</button>
                     )}
                   </td>
                 </tr>

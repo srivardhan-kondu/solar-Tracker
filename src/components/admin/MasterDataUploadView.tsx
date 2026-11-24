@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useLang } from '@/i18n/LanguageContext';
 import {
   Upload,
   FileSpreadsheet,
@@ -16,6 +17,7 @@ import { Consumer, EquipmentInventory } from '@/types';
 import * as XLSX from 'xlsx';
 
 export const MasterDataUploadView: React.FC = () => {
+  const { t } = useLang();
   const { uploadConsumers, uploadInventory } = useApp();
 
   const [activeUploadType, setActiveUploadType] = useState<'consumer' | 'panels' | 'inverters'>('consumer');
@@ -109,10 +111,10 @@ export const MasterDataUploadView: React.FC = () => {
           setAllRows(data);
           setPreviewRows(data.slice(0, 5));
         } else {
-          setParseError('This file has no rows. Please fill in the template and try again.');
+          setParseError(t('This file has no rows. Please fill in the template and try again.'));
         }
       } catch (err) {
-        setParseError('This file could not be read. Please save it as Excel (.xlsx) or CSV and try again.');
+        setParseError(t('This file could not be read. Please save it as Excel (.xlsx) or CSV and try again.'));
       }
     };
     reader.readAsBinaryString(uploadedFile);
@@ -142,12 +144,12 @@ export const MasterDataUploadView: React.FC = () => {
         const name = cell(r, 'name', 'Beneficiary Name', 'Consumer Name');
         const ula = cell(r, 'ula', 'ULA Identifier');
         const missing = [
-          !consumerNumber && 'Consumer Number',
-          !name && 'Name',
-          !ula && 'ULA',
+          !consumerNumber && t('Consumer Number'),
+          !name && t('Name'),
+          !ula && t('ULA'),
         ].filter(Boolean);
         if (missing.length > 0) {
-          skipped.push({ row: rowNo(i), reason: `Missing ${missing.join(', ')}` });
+          skipped.push({ row: rowNo(i), reason: t('Missing {list}', { list: missing.join(', ') }) });
           return;
         }
         const capacity = Number(cell(r, 'capacityKw', 'Capacity kW', 'Capacity'));
@@ -174,7 +176,7 @@ export const MasterDataUploadView: React.FC = () => {
       allRows.forEach((r, i) => {
         const serialNumber = cell(r, 'serialNumber', 'Serial Number', 'Serial');
         if (!serialNumber) {
-          skipped.push({ row: rowNo(i), reason: 'Missing Serial Number' });
+          skipped.push({ row: rowNo(i), reason: t('Missing {list}', { list: t('Serial Number') }) });
           return;
         }
         itemsToInsert.push({
@@ -204,10 +206,8 @@ export const MasterDataUploadView: React.FC = () => {
       {/* Header */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Upload Excel Lists</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Add consumers, panels and inverters from an Excel file. Choose the type of list first.
-          </p>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t("Upload Excel Lists")}</h1>
+          <p className="text-xs text-slate-500 mt-0.5">{t("Add consumers, panels and inverters from an Excel file. Choose the type of list first.")}</p>
         </div>
 
         <button
@@ -216,13 +216,17 @@ export const MasterDataUploadView: React.FC = () => {
         >
           <Download className="w-4 h-4 text-brand-600" />
           <span>
-            Download {activeUploadType === 'consumer' ? 'Consumer' : activeUploadType === 'panels' ? 'Panel' : 'Inverter'} Template
+            {activeUploadType === 'consumer'
+              ? t('Download Consumer Template')
+              : activeUploadType === 'panels'
+              ? t('Download Panel Template')
+              : t('Download Inverter Template')}
           </span>
         </button>
       </div>
 
       {/* Dataset Selection Tabs */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3" role="group" aria-label="Type of list">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3" role="group" aria-label={t("Type of list")}>
         {[
           { key: 'consumer', label: 'Consumer list', desc: 'Names, villages, mobile and ULA numbers' },
           { key: 'panels', label: 'Panel list', desc: 'Serial numbers of solar panels in stock' },
@@ -244,8 +248,8 @@ export const MasterDataUploadView: React.FC = () => {
                 : 'bg-white border-slate-200 hover:border-slate-300'
             }`}
           >
-            <div className="text-base font-bold text-slate-900">{tab.label}</div>
-            <div className="text-sm text-slate-600 mt-0.5">{tab.desc}</div>
+            <div className="text-base font-bold text-slate-900">{t(tab.label)}</div>
+            <div className="text-sm text-slate-600 mt-0.5">{t(tab.desc)}</div>
           </button>
         ))}
       </div>
@@ -257,12 +261,16 @@ export const MasterDataUploadView: React.FC = () => {
           <div className="text-sm font-bold text-slate-800">
             {file
               ? file.name
-              : `Choose the ${activeUploadType === 'consumer' ? 'consumer list' : activeUploadType === 'panels' ? 'panel list' : 'inverter list'} Excel or CSV file`}
+              : activeUploadType === 'consumer'
+              ? t('Choose the consumer list Excel or CSV file')
+              : activeUploadType === 'panels'
+              ? t('Choose the panel list Excel or CSV file')
+              : t('Choose the inverter list Excel or CSV file')}
           </div>
-          <p className="text-xs text-slate-400 mt-1">Supports .xlsx, .xls, and .csv files up to 15MB</p>
+          <p className="text-xs text-slate-400 mt-1">{t("Supports .xlsx, .xls, and .csv files up to 15MB")}</p>
 
           <label className="mt-4 inline-block px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold cursor-pointer shadow-sm transition-colors">
-            <span>Browse Files</span>
+            <span>{t("Browse Files")}</span>
             <input
               type="file"
               accept=".xlsx,.xls,.csv"
@@ -284,9 +292,9 @@ export const MasterDataUploadView: React.FC = () => {
           <div className="space-y-4 pt-4 border-t border-slate-200">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Detected Columns & Sample Preview</h3>
+                <h3 className="text-sm font-bold text-slate-900">{t("Detected Columns & Sample Preview")}</h3>
                 <p className="text-xs text-slate-500">
-                  {allRows.length} rows found in the file • Showing the first {previewRows.length} below
+                  {t('{n} rows found in the file • Showing the first {m} below', { n: allRows.length, m: previewRows.length })}
                 </p>
               </div>
 
@@ -294,7 +302,7 @@ export const MasterDataUploadView: React.FC = () => {
                 onClick={handleCommitImport}
                 className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition-colors"
               >
-                <span>Import all {allRows.length} rows</span>
+                <span>{t('Import all {n} rows', { n: allRows.length })}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -342,27 +350,27 @@ export const MasterDataUploadView: React.FC = () => {
             )}
             <div className="space-y-2">
               <div className="font-bold">
-                {uploadResult.success ? 'Import finished' : 'Nothing was imported'}
+                {uploadResult.success ? t("Import finished") : t("Nothing was imported")}
               </div>
               <p>
-                <span className="font-bold">{uploadResult.inserted} added</span>
-                {uploadResult.updated !== undefined && `, ${uploadResult.updated} existing records updated`}.
+                <span className="font-bold">{t('{n} added', { n: uploadResult.inserted })}</span>
+                {uploadResult.updated !== undefined && ', ' + t('{n} existing records updated', { n: uploadResult.updated })}.
               </p>
               {uploadResult.duplicates && uploadResult.duplicates.length > 0 && (
                 <div className="text-amber-800">
-                  {uploadResult.duplicates.length} serial numbers were already in stock and were skipped:
+                  {t('{n} serial numbers were already in stock and were skipped:', { n: uploadResult.duplicates.length })}
                   <span className="font-mono ml-1">{uploadResult.duplicates.join(', ')}</span>
                 </div>
               )}
               {uploadResult.skipped && uploadResult.skipped.length > 0 && (
                 <div className="text-amber-900">
                   <div className="font-semibold">
-                    {uploadResult.skipped.length} rows were skipped. Fix them in the file and upload again:
+                    {t('{n} rows were skipped. Fix them in the file and upload again:', { n: uploadResult.skipped.length })}
                   </div>
                   <ul className="mt-1 list-disc pl-5 max-h-40 overflow-y-auto">
                     {uploadResult.skipped.map((sk) => (
                       <li key={sk.row}>
-                        Row {sk.row}: {sk.reason}
+                        {t('Row {n}', { n: sk.row })}: {sk.reason}
                       </li>
                     ))}
                   </ul>

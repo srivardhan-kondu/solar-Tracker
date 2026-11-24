@@ -15,6 +15,8 @@ const ACTION_LABEL: Record<string, string> = {
   DISMISS_EXCEPTION: 'Problem dismissed',
   APPROVE_INSTALLATION: 'Installation approved',
   REJECT_INSTALLATION: 'Installation sent back',
+  SUBMIT_SURVEY: 'Site survey sent',
+  REOPEN_SURVEY: 'Site survey reopened',
 };
 
 export const friendly = (code: string) =>

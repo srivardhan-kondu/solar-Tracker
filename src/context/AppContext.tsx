@@ -14,6 +14,7 @@ import {
   PhotoCategory,
   PhotoEvidence,
   GpsLocation,
+  SiteSurvey,
 } from '@/types';
 import {
   SEED_USERS,
@@ -24,7 +25,10 @@ import {
   SEED_SERVICE_TICKETS,
   SEED_EXCEPTIONS,
   SEED_AUDIT_LOGS,
+  SEED_SURVEYS,
 } from '@/data/seedData';
+import { useLang } from '@/i18n/LanguageContext';
+import { canInstall, reopenBlocker, surveyMissing } from '@/lib/survey';
 
 interface AppContextType {
   // State
@@ -43,6 +47,9 @@ interface AppContextType {
   installerDraft: Installation | null;
   activeStep: number;
   selectedConsumerFor360: Consumer | null;
+  surveys: SiteSurvey[];
+  /** True when the browser refused to save (storage full), so recent work may be lost on refresh */
+  storageFull: boolean;
 
   // Setters & Actions
   setCurrentUser: (user: User) => void;
@@ -73,13 +80,22 @@ interface AppContextType {
   recordManualSerial: (serial: string, reason: string) => void;
   logAudit: (action: string, recordType: AuditEvent['recordType'], recordId: string, details: string, oldValue?: string, newValue?: string, reason?: string) => void;
   resetAllData: () => void;
+  /** Change a survey that has not been sent yet; starts one if needed. */
+  updateSurveyDraft: (consumerNumber: string, change: (s: SiteSurvey) => SiteSurvey) => void;
+  submitSurvey: (consumerNumber: string) => { success: boolean; message: string };
+  /** Office only: send a survey back to the installer to be done again */
+  reopenSurvey: (consumerNumber: string, reason: string) => { success: boolean; message: string };
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'SOLAR_TRACKER_DATA_V1';
+// Surveys hold photos, so they are kept apart from the rest of the data
+const SURVEY_STORAGE_KEY = 'SOLAR_TRACKER_SURVEYS_V1';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Messages shown to people are translated; audit records stay in English.
+  const { t } = useLang();
   const [users, setUsers] = useState<User[]>(SEED_USERS);
   const [currentUser, setCurrentUser] = useState<User>(SEED_USERS[0]); // Default Rajesh Varma (Super Admin)
   const [consumers, setConsumers] = useState<Consumer[]>(SEED_CONSUMERS);
@@ -95,6 +111,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [installerDraft, setInstallerDraft] = useState<Installation | null>(null);
   const [activeStep, setActiveStep] = useState<number>(1);
   const [selectedConsumerFor360, setSelectedConsumerFor360] = useState<Consumer | null>(null);
+  const [surveys, setSurveys] = useState<SiteSurvey[]>(SEED_SURVEYS);
+  const [mainStorageFull, setMainStorageFull] = useState(false);
+  const [surveyStorageFull, setSurveyStorageFull] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -114,6 +133,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (parsed.installerDraft) setInstallerDraft(parsed.installerDraft);
         if (parsed.activeStep) setActiveStep(parsed.activeStep);
       }
+      const savedSurveys = localStorage.getItem(SURVEY_STORAGE_KEY);
+      if (savedSurveys) setSurveys(JSON.parse(savedSurveys));
     } catch {
       console.warn('Could not load localStorage data, using seed defaults');
     }
@@ -137,10 +158,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeStep,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+      setMainStorageFull(false);
     } catch {
       // quota or private mode
+      setMainStorageFull(true);
     }
   }, [users, consumers, inventory, installations, dcrRecords, serviceTickets, exceptions, auditLogs, offlineQueue, installerDraft, activeStep]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SURVEY_STORAGE_KEY, JSON.stringify(surveys));
+      setSurveyStorageFull(false);
+    } catch {
+      setSurveyStorageFull(true);
+    }
+  }, [surveys]);
 
   // Audit Logger helper
   const logAudit = (
@@ -172,6 +204,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const startOrResumeInstallation = (consumerNumber: string) => {
     const consumer = consumers.find((c) => c.consumerNumber === consumerNumber);
     if (!consumer) return;
+    // A home is installed only after the site survey says it is feasible
+    if (!canInstall(surveys, installations, consumerNumber)) return;
 
     // Check existing installation
     const existing = installations.find((i) => i.consumerNumber === consumerNumber);
@@ -225,11 +259,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Serial verification against inventory (BR-002, BR-005, BR-006, BR-007)
   const scanPanel = (index: number, serial: string): { success: boolean; message: string; duplicateConsumer?: string } => {
     const cleanSerial = serial.trim().toUpperCase();
-    if (!cleanSerial) return { success: false, message: 'Please scan or type the panel number first.' };
+    if (!cleanSerial) return { success: false, message: t('Please scan or type the panel number first.') };
 
     // Check if already in current draft at another index
     if (installerDraft?.panels.some((p, i) => i !== index && p.toUpperCase() === cleanSerial)) {
-      return { success: false, message: `You already scanned panel ${cleanSerial} for another slot. Please scan a different panel.` };
+      return { success: false, message: t('You already scanned panel {sn} for another slot. Please scan a different panel.', { sn: cleanSerial }) };
     }
 
     // Check central inventory
@@ -240,7 +274,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!invItem) {
       return {
         success: false,
-        message: `Panel number ${cleanSerial} is not in our stock list. Check the label and scan again, or call your supervisor.`,
+        message: t('Panel number {sn} is not in our stock list. Check the label and scan again, or call your supervisor.', { sn: cleanSerial }),
       };
     }
 
@@ -270,7 +304,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       return {
         success: false,
-        message: `Panel ${cleanSerial} is already fitted at another home (${invItem.linkedConsumerNumber}). Please use a different panel. The office has been informed.`,
+        message: t('Panel {sn} is already fitted at another home ({c}). Please use a different panel. The office has been informed.', { sn: cleanSerial, c: invItem.linkedConsumerNumber }),
         duplicateConsumer: invItem.linkedConsumerNumber,
       };
     }
@@ -278,7 +312,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (invItem.status === 'Damaged' || invItem.status === 'Quarantined') {
       return {
         success: false,
-        message: `Panel ${cleanSerial} is marked "${invItem.status}" in the store. Please use a different panel.`,
+        message: t('Panel {sn} is marked "{status}" in the store. Please use a different panel.', { sn: cleanSerial, status: t(invItem.status) }),
       };
     }
 
@@ -291,13 +325,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return {
       success: true,
-      message: `Panel ${index + 1} saved: ${cleanSerial} (${invItem.brand}).`,
+      message: t('Panel {n} saved: {sn} ({brand}).', { n: index + 1, sn: cleanSerial, brand: invItem.brand }),
     };
   };
 
   const scanInverter = (serial: string): { success: boolean; message: string; duplicateConsumer?: string } => {
     const cleanSerial = serial.trim().toUpperCase();
-    if (!cleanSerial) return { success: false, message: 'Please scan or type the inverter number first.' };
+    if (!cleanSerial) return { success: false, message: t('Please scan or type the inverter number first.') };
 
     const invItem = inventory.find(
       (item) => item.type === 'inverter' && item.serialNumber.toUpperCase() === cleanSerial
@@ -306,7 +340,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!invItem) {
       return {
         success: false,
-        message: `Inverter number ${cleanSerial} is not in our stock list. Check the label and scan again, or call your supervisor.`,
+        message: t('Inverter number {sn} is not in our stock list. Check the label and scan again, or call your supervisor.', { sn: cleanSerial }),
       };
     }
 
@@ -328,7 +362,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       return {
         success: false,
-        message: `Inverter ${cleanSerial} is already fitted at another home (${invItem.linkedConsumerNumber}). Please use a different inverter. The office has been informed.`,
+        message: t('Inverter {sn} is already fitted at another home ({c}). Please use a different inverter. The office has been informed.', { sn: cleanSerial, c: invItem.linkedConsumerNumber }),
         duplicateConsumer: invItem.linkedConsumerNumber,
       };
     }
@@ -336,7 +370,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (invItem.status === 'Damaged' || invItem.status === 'Quarantined') {
       return {
         success: false,
-        message: `Inverter ${cleanSerial} is marked "${invItem.status}" in the store. Please use a different inverter.`,
+        message: t('Inverter {sn} is marked "{status}" in the store. Please use a different inverter.', { sn: cleanSerial, status: t(invItem.status) }),
       };
     }
 
@@ -346,7 +380,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return {
       success: true,
-      message: `Inverter saved: ${cleanSerial} (${invItem.brand}).`,
+      message: t('Inverter saved: {sn} ({brand}).', { sn: cleanSerial, brand: invItem.brand }),
     };
   };
 
@@ -378,7 +412,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Submit Installation Draft
   const submitInstallationDraft = (): { success: boolean; isOffline: boolean; message: string } => {
-    if (!installerDraft) return { success: false, isOffline: !isOnline, message: 'No draft found.' };
+    if (!installerDraft) return { success: false, isOffline: !isOnline, message: t('No draft found.') };
 
     const missingPhotos: string[] = [];
     const requiredCats: PhotoCategory[] = ['front', 'side', 'consumer', 'meter', 'inverter', 'structure', 'earthing'];
@@ -441,7 +475,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return {
         success: true,
         isOffline: true,
-        message: 'Saved on this phone. It will be sent to the office automatically when the internet comes back.',
+        message: t('Saved on this phone. It will be sent to the office automatically when the internet comes back.'),
       };
     }
 
@@ -537,8 +571,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       success: true,
       isOffline: false,
       message: isComplete
-        ? 'Installation sent to the office successfully.'
-        : 'Installation sent, but some items are missing. The office will review it and may contact you.',
+        ? t('Installation sent to the office successfully.')
+        : t('Installation sent, but some items are missing. The office will review it and may contact you.'),
     };
   };
 
@@ -970,6 +1004,128 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+  // ---------- Site survey ----------
+  const updateSurveyDraft = (consumerNumber: string, change: (s: SiteSurvey) => SiteSurvey) => {
+    setSurveys((prev) => {
+      const existing = prev.find((s) => s.consumerNumber === consumerNumber);
+      if (existing?.status === 'Submitted') return prev; // sent surveys cannot be changed
+      const base: SiteSurvey = existing ?? {
+        id: `svy_${Date.now()}`,
+        consumerNumber,
+        surveyorId: currentUser.id,
+        surveyorName: currentUser.name,
+        status: 'Draft',
+        startedAt: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+        roofPhotos: [],
+        shadeSources: [],
+        surroundingsPhotos: [],
+      };
+      return [change(base), ...prev.filter((s) => s.consumerNumber !== consumerNumber)];
+    });
+  };
+
+  const submitSurvey = (consumerNumber: string): { success: boolean; message: string } => {
+    const survey = surveys.find((s) => s.consumerNumber === consumerNumber);
+    if (!survey) return { success: false, message: t('Survey not started') };
+    if (survey.status === 'Submitted') return { success: false, message: t('This survey was already sent.') };
+    const missing = surveyMissing(survey, t);
+    if (missing.length) return { success: false, message: t('Please finish: {list}', { list: missing.join(', ') }) };
+
+    const timestamp = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+    const consumer = consumers.find((c) => c.consumerNumber === consumerNumber);
+    setSurveys((prev) =>
+      prev.map((s) => (s.consumerNumber === consumerNumber ? { ...s, status: 'Submitted', submittedAt: timestamp } : s))
+    );
+
+    const feasible = survey.decision === 'Feasible';
+    const shade =
+      survey.shadeLevel === 'None' ? 'no shade' : `${survey.shadeLevel?.toLowerCase()} shade (${survey.shadeSources.join(', ')})`;
+    logAudit(
+      'SUBMIT_SURVEY',
+      'Consumer',
+      consumerNumber,
+      `Site survey: ${feasible ? 'FEASIBLE' : 'NOT FEASIBLE'}. Roof: ${survey.roofType}, ${shade}.` +
+        (survey.decisionNote?.trim() ? ` Note: ${survey.decisionNote.trim()}` : ''),
+      undefined,
+      survey.decision
+    );
+
+    if (!feasible) {
+      // Let the office know so they can call the consumer
+      const exc: ActionRequiredException = {
+        id: `exc_${Date.now()}_svy`,
+        type: 'site_not_feasible',
+        title: `Site not feasible: ${consumerNumber}`,
+        consumerNumber,
+        division: consumer?.division || 'Unknown',
+        village: consumer?.village || 'Unknown',
+        detectedDate: timestamp,
+        priority: 'Medium',
+        assignedOwner: 'Office',
+        status: 'Open',
+        description: `${currentUser.name} surveyed the site and marked it not feasible. Roof: ${survey.roofType}, ${shade}. Reason: ${survey.decisionNote?.trim()}`,
+      };
+      setExceptions((prev) => [exc, ...prev]);
+    }
+
+    return {
+      success: true,
+      message: feasible
+        ? t('Survey sent. This home is now ready for installation.')
+        : t('Survey sent. The office has been told this home is not feasible.'),
+    };
+  };
+
+  const reopenSurvey = (consumerNumber: string, reason: string): { success: boolean; message: string } => {
+    if (currentUser.role !== 'Admin' && currentUser.role !== 'Super Admin')
+      return { success: false, message: t('Only office staff can reopen a survey.') };
+    if (!reason.trim()) return { success: false, message: t('Please write why the survey is being reopened.') };
+    const survey = surveys.find((s) => s.consumerNumber === consumerNumber);
+    const consumer = consumers.find((c) => c.consumerNumber === consumerNumber);
+    const blocker = reopenBlocker(survey, consumer, installations, t);
+    if (blocker || !survey) return { success: false, message: blocker || t('Survey not started') };
+
+    const timestamp = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+    // Photos and roof details are kept; the installer must decide again
+    setSurveys((prev) =>
+      prev.map((s) =>
+        s.consumerNumber === consumerNumber
+          ? {
+              ...s,
+              status: 'Draft',
+              submittedAt: undefined,
+              decision: undefined,
+              decisionNote: undefined,
+              reopenedBy: currentUser.name,
+              reopenedAt: timestamp,
+              reopenNote: reason.trim(),
+            }
+          : s
+      )
+    );
+
+    // A "not feasible" problem for this home is no longer open
+    setExceptions((prev) =>
+      prev.map((e) =>
+        e.type === 'site_not_feasible' && e.consumerNumber === consumerNumber && (e.status === 'Open' || e.status === 'In Progress')
+          ? { ...e, status: 'Resolved', resolutionNote: `Survey reopened: ${reason.trim()}`, resolvedAt: timestamp, resolvedBy: currentUser.name }
+          : e
+      )
+    );
+
+    logAudit(
+      'REOPEN_SURVEY',
+      'Consumer',
+      consumerNumber,
+      `Site survey reopened by ${currentUser.name}. Previous decision: ${survey.decision}.`,
+      survey.decision,
+      'Reopened',
+      reason.trim()
+    );
+
+    return { success: true, message: t('Survey reopened. It is back on the installer\'s Site Survey list.') };
+  };
+
   const resetAllData = () => {
     setUsers(SEED_USERS);
     setCurrentUser(SEED_USERS[0]);
@@ -983,7 +1139,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setOfflineQueue([]);
     setInstallerDraft(null);
     setActiveStep(1);
+    setSurveys(SEED_SURVEYS);
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(SURVEY_STORAGE_KEY);
   };
 
   return (
@@ -1004,6 +1162,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         installerDraft,
         activeStep,
         selectedConsumerFor360,
+        surveys,
+        storageFull: mainStorageFull || surveyStorageFull,
         setCurrentUser,
         setAppMode,
         setIsOnline,
@@ -1032,6 +1192,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         recordManualSerial,
         logAudit,
         resetAllData,
+        updateSurveyDraft,
+        submitSurvey,
+        reopenSurvey,
       }}
     >
       {children}
