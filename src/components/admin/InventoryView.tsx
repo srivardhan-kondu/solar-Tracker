@@ -172,14 +172,14 @@ export const InventoryView: React.FC = () => {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
               <tr>
                 <th className="py-3 px-4">Serial Number</th>
                 <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4">Manufacturer & Model</th>
+                <th className="py-3 px-4">Make & model</th>
                 <th className="py-3 px-4">Batch</th>
-                <th className="py-3 px-4">Locked To Consumer</th>
+                <th className="py-3 px-4">Fitted at</th>
                 <th className="py-3 px-4 text-right">Status</th>
               </tr>
             </thead>
@@ -197,9 +197,9 @@ export const InventoryView: React.FC = () => {
                   <td className="py-3 px-4 capitalize font-semibold text-slate-600">{item.type}</td>
                   <td className="py-3 px-4">
                     <div className="font-bold text-slate-800">{item.brand}</div>
-                    <div className="text-[11px] text-slate-400">{item.model}</div>
+                    <div className="text-xs text-slate-400">{item.model}</div>
                   </td>
-                  <td className="py-3 px-4 font-mono text-[11px] text-slate-500">{item.batch}</td>
+                  <td className="py-3 px-4 font-mono text-xs text-slate-500">{item.batch}</td>
                   <td className="py-3 px-4">
                     {item.linkedConsumerNumber ? (
                       <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
@@ -211,7 +211,7 @@ export const InventoryView: React.FC = () => {
                   </td>
                   <td className="py-3 px-4 text-right">
                     <span
-                      className={`px-2.5 py-1 rounded-full font-bold text-[10px] ${
+                      className={`px-2.5 py-1 rounded-full font-bold text-xs ${
                         item.status === 'Installed'
                           ? 'bg-emerald-100 text-emerald-800'
                           : item.status === 'Available'

@@ -21,6 +21,7 @@ import { useApp } from '@/context/AppContext';
 import { Consumer, PhotoEvidence } from '@/types';
 import { missingItems } from '@/lib/installationSteps';
 import { STATUS_LABEL } from '@/lib/status';
+import { friendly } from '@/lib/activity';
 
 export const Consumer360Modal: React.FC<{
   consumer: Consumer;
@@ -94,7 +95,7 @@ export const Consumer360Modal: React.FC<{
                   {consumer.consumerNumber}
                 </span>
                 <span
-                  className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                  className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                     consumer.status === 'Completed'
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                       : consumer.status === 'Needs Review'
@@ -132,7 +133,7 @@ export const Consumer360Modal: React.FC<{
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            Overview & Equipment
+            Summary
           </button>
           <button
             onClick={() => setActiveTab('evidence')}
@@ -143,9 +144,9 @@ export const Consumer360Modal: React.FC<{
             }`}
           >
             <Camera className="w-4 h-4" />
-            <span>7 Photos & Geotag</span>
+            <span>Photos & location</span>
             {installation && (
-              <span className="text-[10px] bg-brand-100 text-brand-800 px-1.5 py-0.2 rounded-full">
+              <span className="text-xs bg-brand-100 text-brand-800 px-1.5 py-0.5 rounded-full">
                 {Object.keys(installation.photos || {}).length}/7
               </span>
             )}
@@ -159,7 +160,7 @@ export const Consumer360Modal: React.FC<{
             }`}
           >
             <Wrench className="w-4 h-4" />
-            <span>Service Tickets ({consumerTickets.length})</span>
+            <span>Service complaints ({consumerTickets.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('audit')}
@@ -170,7 +171,7 @@ export const Consumer360Modal: React.FC<{
             }`}
           >
             <History className="w-4 h-4" />
-            <span>Audit Trail</span>
+            <span>History</span>
           </button>
         </div>
 
@@ -182,8 +183,8 @@ export const Consumer360Modal: React.FC<{
               {/* Top Quick Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Installation Status
+                  <span className="text-xs font-semibold text-slate-500">
+                    Status
                   </span>
                   <div className="mt-1 flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5 text-emerald-600" />
@@ -195,29 +196,29 @@ export const Consumer360Modal: React.FC<{
                 </div>
 
                 <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    DCR Mapping Status
+                  <span className="text-xs font-semibold text-slate-500">
+                    DCR number
                   </span>
                   <div className="mt-1 flex items-center gap-2">
                     <FileSpreadsheet className="w-5 h-5 text-brand-600" />
                     <span className="text-base font-bold text-slate-900">
-                      {consumerDcr ? consumerDcr.dcrNumber : 'Pending Upload'}
+                      {consumerDcr ? consumerDcr.dcrNumber : 'Not received yet'}
                     </span>
                   </div>
                   <div className="text-xs text-slate-500 mt-2">
-                    ULA Key: <span className="font-mono font-bold text-slate-800">{consumer.ula}</span>
+                    ULA: <span className="font-mono font-bold text-slate-800">{consumer.ula}</span>
                   </div>
                 </div>
 
                 <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    System Specifications
+                  <span className="text-xs font-semibold text-slate-500">
+                    System size
                   </span>
                   <div className="mt-1 flex items-center gap-2">
                     <Box className="w-5 h-5 text-blue-600" />
-                    <span className="text-base font-bold text-slate-900">{consumer.capacityKw} kW Solar PV</span>
+                    <span className="text-base font-bold text-slate-900">{consumer.capacityKw} kW</span>
                   </div>
-                  <div className="text-xs text-slate-500 mt-2">Configuration: 4 Panels + 1 Inverter</div>
+                  <div className="text-xs text-slate-500 mt-2">4 panels + 1 inverter</div>
                 </div>
               </div>
 
@@ -226,16 +227,15 @@ export const Consumer360Modal: React.FC<{
                 <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                     <Box className="w-4 h-4 text-brand-600" />
-                    Locked Equipment Serials (Atomic Inventory Allocation)
+                    Panels and inverter fitted at this home
                   </h3>
-                  <span className="text-xs text-slate-500">Authoritative Central Record</span>
                 </div>
 
                 <div className="divide-y divide-slate-100">
                   {/* Panels */}
                   <div className="p-4">
-                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                      Solar PV Panels (4 Modules Required)
+                    <div className="text-xs font-bold text-slate-500 mb-2">
+                      Panels (4 needed)
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                       {[0, 1, 2, 3].map((idx) => {
@@ -254,11 +254,11 @@ export const Consumer360Modal: React.FC<{
                             {serial ? (
                               <>
                                 <div className="font-mono font-bold text-emerald-800 mt-1">{serial}</div>
-                                <div className="text-[11px] text-slate-500 mt-0.5">
+                                <div className="text-xs text-slate-500 mt-0.5">
                                   {invItem?.brand || 'Tata Power'} 540W
                                 </div>
-                                <div className="text-[10px] text-emerald-600 font-semibold mt-1">
-                                  ✓ Status: Locked
+                                <div className="text-xs text-emerald-600 font-semibold mt-1">
+                                  ✓ Recorded
                                 </div>
                               </>
                             ) : (
@@ -272,8 +272,8 @@ export const Consumer360Modal: React.FC<{
 
                   {/* Inverter */}
                   <div className="p-4 bg-slate-50/50">
-                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                      Solar Inverter
+                    <div className="text-xs font-bold text-slate-500 mb-2">
+                      Inverter
                     </div>
                     {installation?.inverterSerial ? (
                       <div className="p-3 bg-white rounded-lg border border-slate-200 flex items-center justify-between">
@@ -284,11 +284,11 @@ export const Consumer360Modal: React.FC<{
                           <div className="text-xs text-slate-500">Havells Enviro 3.3kW Single Phase</div>
                         </div>
                         <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full">
-                          ✓ Locked to Consumer
+                          ✓ Recorded
                         </span>
                       </div>
                     ) : (
-                      <div className="text-xs text-slate-400 italic">No inverter serial recorded.</div>
+                      <div className="text-xs text-slate-400 italic">Inverter not scanned yet.</div>
                     )}
                   </div>
                 </div>
@@ -420,16 +420,16 @@ export const Consumer360Modal: React.FC<{
                     <MapPin className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-slate-900">Geotagged Coordinates</div>
+                    <div className="text-xs font-bold text-slate-900">Location</div>
                     {installation?.gps ? (
                       <div className="text-xs font-mono font-semibold text-slate-700">
                         {installation.gps.latitude.toFixed(6)}° N, {installation.gps.longitude.toFixed(6)}° E • Accuracy:{' '}
                         {installation.gps.accuracy}m
                       </div>
                     ) : (
-                      <div className="text-xs text-slate-400">GPS not yet captured</div>
+                      <div className="text-xs text-slate-400">Location not captured yet</div>
                     )}
-                    <div className="text-[11px] text-slate-500 mt-0.5">
+                    <div className="text-xs text-slate-500 mt-0.5">
                       {installation?.gps?.address || `${consumer.village}, ${consumer.district}`}
                     </div>
                   </div>
@@ -443,7 +443,7 @@ export const Consumer360Modal: React.FC<{
                     className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg text-xs font-semibold text-slate-700 flex items-center gap-1.5"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
-                    <span>View on Google Maps</span>
+                    <span>Open in Google Maps</span>
                   </a>
                 )}
               </div>
@@ -452,8 +452,8 @@ export const Consumer360Modal: React.FC<{
               <div>
                 <div className="flex justify-between items-center mb-3">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">7 Mandatory Installation Photographs</h3>
-                    <p className="text-xs text-slate-500">Click any image to view high-resolution evidence</p>
+                    <h3 className="text-sm font-bold text-slate-900">The 7 required photos</h3>
+                    <p className="text-xs text-slate-500">Click a photo to see it bigger</p>
                   </div>
                 </div>
 
@@ -493,19 +493,18 @@ export const Consumer360Modal: React.FC<{
                           ) : (
                             <div className="text-center p-4">
                               <Camera className="w-8 h-8 text-slate-300 mx-auto mb-1" />
-                              <div className="text-xs font-semibold text-slate-400">Missing Evidence</div>
-                              <div className="text-[10px] text-red-500 font-bold mt-1">Action Required</div>
+                              <div className="text-xs font-semibold text-slate-400">Photo missing</div>
                             </div>
                           )}
                         </div>
                         <div className="p-3">
                           <div className="text-xs font-bold text-slate-800">{item.title}</div>
                           {photo ? (
-                            <div className="text-[11px] text-emerald-600 font-medium mt-0.5">
+                            <div className="text-xs text-emerald-600 font-medium mt-0.5">
                               ✓ Captured at {photo.capturedAt}
                             </div>
                           ) : (
-                            <div className="text-[11px] text-slate-400 mt-0.5 italic">Not submitted</div>
+                            <div className="text-xs text-slate-400 mt-0.5 italic">Not taken yet</div>
                           )}
                         </div>
                       </div>
@@ -520,7 +519,7 @@ export const Consumer360Modal: React.FC<{
           {activeTab === 'service' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="text-sm font-bold text-slate-900">Service & Maintenance History</h3>
+                <h3 className="text-sm font-bold text-slate-900">Service complaints</h3>
               </div>
 
               {consumerTickets.length > 0 ? (
@@ -548,14 +547,14 @@ export const Consumer360Modal: React.FC<{
                         </span>
                       </div>
 
-                      <div className="pt-2 border-t border-slate-200 flex justify-between text-[11px] text-slate-500">
-                        <span>Assigned Engineer: {t.assignedEngineerName || 'Unassigned'}</span>
+                      <div className="pt-2 border-t border-slate-200 flex justify-between text-xs text-slate-500">
+                        <span>Engineer: {t.assignedEngineerName || 'Unassigned'}</span>
                         <span>Logged: {t.createdAt}</span>
                       </div>
 
                       {t.visitNotes && (
                         <div className="p-2.5 bg-white rounded border border-slate-200 text-xs text-slate-700">
-                          <span className="font-bold">Engineer Visit Notes:</span> {t.visitNotes}
+                          <span className="font-bold">Visit notes:</span> {t.visitNotes}
                         </div>
                       )}
                     </div>
@@ -563,7 +562,7 @@ export const Consumer360Modal: React.FC<{
                 </div>
               ) : (
                 <div className="text-center py-8 text-xs text-slate-500 bg-slate-50 rounded-xl border border-slate-200">
-                  No service tickets logged for this consumer. System running smoothly.
+                  No complaints from this consumer.
                 </div>
               )}
             </div>
@@ -572,18 +571,18 @@ export const Consumer360Modal: React.FC<{
           {/* TAB 4: AUDIT TRAIL */}
           {activeTab === 'audit' && (
             <div className="space-y-4">
-              <h3 className="text-sm font-bold text-slate-900">Immutable Audit Trail</h3>
+              <h3 className="text-sm font-bold text-slate-900">History</h3>
               <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
                 {consumerLogs.length === 0 && <p className="text-sm text-slate-500">No activity recorded yet.</p>}
                 {consumerLogs.map((log) => (
                   <div key={log.id} className="relative">
                     <div className="absolute -left-6 top-1 w-3.5 h-3.5 rounded-full bg-brand-600 border-2 border-white" />
                     <div className="text-xs font-bold text-slate-900">
-                      {log.action} <span className="text-slate-400 font-normal">by</span> {log.actorName} (
+                      {friendly(log.action)} <span className="text-slate-500 font-normal">by</span> {log.actorName} (
                       {log.actorRole})
                     </div>
                     <div className="text-xs text-slate-600 mt-0.5">{log.details}</div>
-                    <div className="text-[10px] text-slate-400 mt-1">{log.timestamp}</div>
+                    <div className="text-xs text-slate-400 mt-1">{log.timestamp}</div>
                   </div>
                 ))}
               </div>
@@ -597,7 +596,7 @@ export const Consumer360Modal: React.FC<{
             onClick={onClose}
             className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-colors"
           >
-            Close View
+            Close
           </button>
         </div>
       </div>

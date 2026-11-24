@@ -156,7 +156,7 @@ export const DashboardView: React.FC<{
                 <span className="text-sm font-bold text-slate-600">{k.label}</span>
                 <Icon className={`w-5 h-5 flex-shrink-0 ${k.iconColor}`} />
               </div>
-              <div className={`text-3xl font-extrabold mt-2 ${k.color}`}>{k.value}</div>
+              <div className={`text-3xl font-bold mt-2 ${k.color}`}>{k.value}</div>
               <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
                 <span>{k.note}</span>
                 <ArrowUpRight className="w-3 h-3 ml-auto flex-shrink-0" />

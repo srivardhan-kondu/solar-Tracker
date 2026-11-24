@@ -1,64 +1,61 @@
 'use client';
 
-import React from 'react';
-import { History, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { History, Search } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import { friendly } from '@/lib/activity';
 
 export const AuditLogView: React.FC = () => {
   const { auditLogs } = useApp();
+  const [query, setQuery] = useState('');
+
+  const q = query.trim().toLowerCase();
+  const rows = q
+    ? auditLogs.filter((l) =>
+        [l.actorName, friendly(l.action), l.recordId, l.details].some((v) => v.toLowerCase().includes(q))
+      )
+    : auditLogs;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">System Audit Trail</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Immutable, append-only record of all critical allocations, master uploads, duplicate rejections, and approvals.
+          <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <History className="w-7 h-7 text-brand-600" />
+            Activity History
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Everything important that anyone has done, newest first. Entries cannot be changed or deleted.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-semibold bg-brand-50 text-brand-800 px-3 py-1.5 rounded-xl border border-brand-200">
-          <ShieldCheck className="w-4 h-4 text-brand-600" />
-          <span>Tamper-Resistant Log</span>
-        </div>
+        <label className="relative w-full sm:w-96">
+          <Search className="w-5 h-5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by person, action or consumer"
+            aria-label="Search activity history"
+            className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border-2 border-slate-300 rounded-xl text-base focus:outline-none focus:border-brand-600 focus:bg-white"
+          />
+        </label>
       </div>
 
-      {/* Audit Log Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
-              <tr>
-                <th className="py-3 px-4">Timestamp</th>
-                <th className="py-3 px-4">Actor</th>
-                <th className="py-3 px-4">Action</th>
-                <th className="py-3 px-4">Record Type & ID</th>
-                <th className="py-3 px-4">Details</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
-              {auditLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-slate-50">
-                  <td className="py-3 px-4 text-slate-400 whitespace-nowrap">{log.timestamp}</td>
-                  <td className="py-3 px-4 whitespace-nowrap">
-                    <span className="font-bold text-slate-900">{log.actorName}</span>
-                    <span className="text-[10px] text-slate-400 ml-1">({log.actorRole})</span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className="font-mono text-[10px] font-bold bg-slate-100 text-slate-800 px-2 py-0.5 rounded">
-                      {log.action}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 font-mono text-[11px] text-brand-700 font-semibold whitespace-nowrap">
-                    {log.recordType}: {log.recordId}
-                  </td>
-                  <td className="py-3 px-4 text-slate-600">{log.details}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm divide-y divide-slate-100">
+        {rows.length === 0 && <div className="p-10 text-center text-base text-slate-500">Nothing found.</div>}
+        {rows.map((log) => (
+          <div key={log.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-6">
+            <div className="sm:w-48 flex-shrink-0 text-sm text-slate-500">{log.timestamp}</div>
+            <div className="flex-1 space-y-1">
+              <div className="text-base font-bold text-slate-900">{friendly(log.action)}</div>
+              <div className="text-sm text-slate-700">{log.details}</div>
+              <div className="text-sm text-slate-500">
+                By {log.actorName} · {log.recordType} {log.recordId}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

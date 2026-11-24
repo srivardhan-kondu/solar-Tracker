@@ -147,11 +147,11 @@ export const AssignmentView: React.FC = () => {
             >
               <div className="flex justify-between items-center">
                 <div className="font-bold text-xs text-slate-900">{inst.name}</div>
-                <span className="text-[10px] font-bold bg-brand-50 text-brand-700 px-2 py-0.5 rounded">
+                <span className="text-xs font-bold bg-brand-50 text-brand-700 px-2 py-0.5 rounded">
                   {inst.division}
                 </span>
               </div>
-              <div className="text-xl font-extrabold text-slate-800">
+              <div className="text-xl font-bold text-slate-800">
                 {assignedCount} <span className="text-xs font-normal text-slate-500">Consumers Allocated</span>
               </div>
               <div className="text-sm text-emerald-600 font-semibold">{completedCount} done so far</div>
@@ -198,15 +198,15 @@ export const AssignmentView: React.FC = () => {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
               <tr>
-                <th className="py-3 px-4 w-10">Select</th>
+                <th className="py-3 px-4 w-10">Tick</th>
                 <th className="py-3 px-4">Consumer Number</th>
-                <th className="py-3 px-4">Beneficiary Name</th>
+                <th className="py-3 px-4">Name</th>
                 <th className="py-3 px-4">Village / Mandal</th>
                 <th className="py-3 px-4">Capacity</th>
-                <th className="py-3 px-4">Currently Assigned To</th>
+                <th className="py-3 px-4">Installer</th>
                 <th className="py-3 px-4 text-right">Status</th>
               </tr>
             </thead>
@@ -238,7 +238,7 @@ export const AssignmentView: React.FC = () => {
                       {c.assignedInstallerName ? (
                         <span className="font-semibold text-slate-900">{c.assignedInstallerName}</span>
                       ) : (
-                        <span className="text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded text-[11px]">
+                        <span className="text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded text-xs">
                           Unassigned
                         </span>
                       )}

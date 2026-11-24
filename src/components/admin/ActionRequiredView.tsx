@@ -110,7 +110,7 @@ export const ActionRequiredView: React.FC<{
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-2">
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                      className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                         exc.priority === 'High' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
                       }`}
                     >

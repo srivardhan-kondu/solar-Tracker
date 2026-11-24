@@ -241,10 +241,10 @@ export const ReportsView: React.FC = () => {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
         <div className="border-b border-slate-200 pb-4 flex justify-between items-center">
           <div>
-            <div className="text-xs font-bold uppercase tracking-wider text-brand-600">
+            <div className="text-xs font-bold text-brand-600">
               Solar Operations Management System
             </div>
-            <h2 className="text-base font-extrabold text-slate-900 mt-0.5">
+            <h2 className="text-base font-bold text-slate-900 mt-0.5">
               {reportList.find((r) => r.id === activeReport)?.title}
             </h2>
             <div className="text-xs text-slate-500 mt-1">
@@ -259,8 +259,8 @@ export const ReportsView: React.FC = () => {
 
         {/* Data Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase tracking-wider font-bold">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
               <tr>
                 {columns.map((c) => (
                   <th key={c} className="py-3 px-3.5">

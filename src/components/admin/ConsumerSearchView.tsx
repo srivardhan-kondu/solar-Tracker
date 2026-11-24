@@ -169,16 +169,15 @@ export const ConsumerSearchView: React.FC<{
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
+            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
               <tr>
-                <th className="py-3 px-4">Consumer No.</th>
-                <th className="py-3 px-4">Name</th>
-                <th className="py-3 px-4">Village / Division</th>
-                <th className="py-3 px-4">ULA</th>
+                <th className="py-3 px-4">Consumer</th>
+                <th className="py-3 px-4">Village</th>
                 <th className="py-3 px-4">Installer</th>
-                <th className="py-3 px-4">DCR No.</th>
                 <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right"><span className="sr-only">Open</span></th>
+                <th className="py-3 px-4 text-right">
+                  <span className="sr-only">Open</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -186,42 +185,44 @@ export const ConsumerSearchView: React.FC<{
                 filteredConsumers.map((c) => {
                   const inst = installationByConsumer.get(c.consumerNumber);
                   return (
-                    <tr key={c.id} className="hover:bg-brand-50/50 transition-colors">
-                      <td className="py-3.5 px-4 font-mono font-bold text-slate-900">{c.consumerNumber}</td>
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-900">{c.name}</div>
-                        <div className="text-[11px] text-slate-400">{c.mobile}</div>
+                    <tr key={c.id} className="hover:bg-brand-50/50 transition-colors align-top">
+                      <td className="py-4 px-4">
+                        <div className="text-base font-bold text-slate-900">{c.name}</div>
+                        <div className="font-mono text-sm text-slate-700">{c.consumerNumber}</div>
+                        <div className="text-sm text-slate-500">
+                          {c.mobile} · ULA <span className="font-mono">{c.ula}</span>
+                        </div>
                       </td>
-                      <td className="py-3.5 px-4">
-                        <div className="text-slate-800 font-medium">{c.village}</div>
-                        <div className="text-[11px] text-slate-500">{c.division}</div>
+                      <td className="py-4 px-4">
+                        <div className="text-slate-900">{c.village}</div>
+                        <div className="text-sm text-slate-500">{c.division}</div>
                       </td>
-                      <td className="py-3.5 px-4">
-                        <span className="font-mono text-brand-700 bg-brand-50 px-2 py-0.5 rounded font-bold text-[11px]">
-                          {c.ula}
-                        </span>
+                      <td className="py-4 px-4 text-slate-800">
+                        {c.assignedInstallerName || <span className="text-amber-700 font-semibold">Not assigned</span>}
                       </td>
-                      <td className="py-3.5 px-4 text-slate-800">{c.assignedInstallerName || 'Unassigned'}</td>
-                      <td className="py-3.5 px-4">
-                        {inst?.dcrNumber ? (
-                          <span className="font-mono text-xs font-bold text-emerald-700">
-                            ✓ {inst.dcrNumber}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 italic">Pending</span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className={`px-2.5 py-1 rounded-full font-bold text-xs whitespace-nowrap ${statusBadgeClass(c.status)}`}>
+                      <td className="py-4 px-4">
+                        <span
+                          className={`inline-block px-3 py-1 rounded-full font-bold text-sm whitespace-nowrap ${statusBadgeClass(c.status)}`}
+                        >
                           {STATUS_LABEL[c.status]}
                         </span>
+                        <div className="text-sm mt-1.5">
+                          {inst?.dcrNumber ? (
+                            <span className="text-emerald-700">
+                              DCR: <span className="font-mono font-bold">{inst.dcrNumber}</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">DCR not received</span>
+                          )}
+                        </div>
                       </td>
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-4 px-4 text-right">
                         <button
                           onClick={() => onSelectConsumer(c)}
-                          className="px-4 py-2 bg-brand-50 hover:bg-brand-100 text-brand-700 rounded-lg font-bold text-sm inline-flex items-center gap-1.5 transition-colors border border-brand-200"
+                          aria-label={`Open ${c.name}`}
+                          className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-base inline-flex items-center gap-2"
                         >
-                          <Eye className="w-3.5 h-3.5" />
+                          <Eye className="w-5 h-5" />
                           <span>Open</span>
                         </button>
                       </td>
@@ -230,7 +231,7 @@ export const ConsumerSearchView: React.FC<{
                 })
               ) : (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center text-sm text-slate-500">
+                  <td colSpan={5} className="py-10 text-center text-sm text-slate-500">
                     No consumers match.{' '}
                     {(q || statusFilter !== 'All' || divisionFilter !== 'All') && (
                       <button

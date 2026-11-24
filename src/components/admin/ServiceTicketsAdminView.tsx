@@ -128,7 +128,7 @@ export const ServiceTicketsAdminView: React.FC = () => {
                   {t.ticketNumber}
                 </span>
                 <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                     t.priority === 'High' || t.priority === 'Urgent'
                       ? 'bg-red-100 text-red-800'
                       : 'bg-blue-100 text-blue-800'

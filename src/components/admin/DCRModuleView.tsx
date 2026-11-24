@@ -153,7 +153,7 @@ export const DCRModuleView: React.FC = () => {
                 <div className="text-xs font-bold text-slate-900">
                   {dcrRows.length} rows ready to match
                 </div>
-                <div className="text-[11px] text-slate-500">
+                <div className="text-xs text-slate-500">
                   System will cross-reference ULA against consumer master database.
                 </div>
               </div>
@@ -244,8 +244,8 @@ export const DCRModuleView: React.FC = () => {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
               <tr>
                 <th className="py-3 px-4">ULA Key</th>
                 <th className="py-3 px-4">DCR Number</th>
@@ -264,7 +264,7 @@ export const DCRModuleView: React.FC = () => {
                     {d.consumerNumber ? (
                       <div>
                         <div className="font-bold text-slate-900">{d.consumerName}</div>
-                        <div className="text-[11px] text-slate-400 font-mono">{d.consumerNumber}</div>
+                        <div className="text-xs text-slate-400 font-mono">{d.consumerNumber}</div>
                       </div>
                     ) : (
                       <span className="text-slate-400 italic">No master record</span>
@@ -274,7 +274,7 @@ export const DCRModuleView: React.FC = () => {
                   <td className="py-3 px-4 text-slate-400">{d.uploadedAt}</td>
                   <td className="py-3 px-4 text-right">
                     <span
-                      className={`px-2.5 py-1 rounded-full font-bold text-[10px] ${
+                      className={`px-2.5 py-1 rounded-full font-bold text-xs ${
                         d.status === 'Matched'
                           ? 'bg-emerald-100 text-emerald-800'
                           : d.status === 'ULA Not Found'

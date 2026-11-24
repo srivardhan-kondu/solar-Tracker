@@ -245,7 +245,7 @@ export const MasterDataUploadView: React.FC = () => {
             }`}
           >
             <div className="text-xs font-bold text-slate-900">{tab.label}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">{tab.desc}</div>
+            <div className="text-xs text-slate-500 mt-0.5">{tab.desc}</div>
           </button>
         ))}
       </div>
@@ -301,7 +301,7 @@ export const MasterDataUploadView: React.FC = () => {
 
             <div className="overflow-x-auto border border-slate-200 rounded-xl">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
                   <tr>
                     {detectedColumns.map((col) => (
                       <th key={col} className="py-2.5 px-3">
@@ -314,7 +314,7 @@ export const MasterDataUploadView: React.FC = () => {
                   {previewRows.map((row, i) => (
                     <tr key={i} className="hover:bg-slate-50">
                       {detectedColumns.map((col) => (
-                        <td key={col} className="py-2.5 px-3 font-mono text-[11px]">
+                        <td key={col} className="py-2.5 px-3 font-mono text-xs">
                           {String(row[col] ?? '')}
                         </td>
                       ))}
