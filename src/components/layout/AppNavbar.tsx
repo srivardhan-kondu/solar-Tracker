@@ -13,6 +13,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import { isOfficeRole } from '@/lib/access';
 import { UserRole } from '@/types';
 
 interface AppNavbarProps {
@@ -58,7 +59,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onSearchSelect, onNavigate
           {/* Logo & Brand */}
           <div className="flex items-center gap-3 flex-shrink-0">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-amber-500 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
-              <Sun className="w-6 h-6 animate-[spin_12s_linear_infinite]" />
+              <Sun className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -87,8 +88,11 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onSearchSelect, onNavigate
                   setShowSearchResults(true);
                 }}
                 onFocus={() => setShowSearchResults(true)}
-                placeholder="Search Consumer #, ULA, Village, Mobile..."
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all"
+                placeholder="Search name, village, mobile or consumer no."
+                aria-label="Search consumers"
+                onKeyDown={(e) => e.key === 'Escape' && setShowSearchResults(false)}
+                onBlur={() => setTimeout(() => setShowSearchResults(false), 150)}
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all"
               />
             </div>
 
@@ -103,7 +107,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onSearchSelect, onNavigate
                         setSelectedConsumerFor360(c);
                         setShowSearchResults(false);
                         setSearchQuery('');
-                        if (onNavigateToTab) onNavigateToTab('installations');
+                        onNavigateToTab?.('installations');
                       }}
                       className="w-full text-left px-4 py-2.5 hover:bg-brand-50 flex items-center justify-between text-xs transition-colors"
                     >
@@ -122,7 +126,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onSearchSelect, onNavigate
                     </button>
                   ))
                 ) : (
-                  <div className="p-3 text-xs text-slate-500 text-center">No matching records found.</div>
+                  <div className="p-3 text-sm text-slate-500 text-center">No one found. Try part of the name or village.</div>
                 )}
               </div>
             )}
@@ -130,11 +134,13 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onSearchSelect, onNavigate
 
           {/* Action Center, Persona Switcher & Reset */}
           <div className="flex items-center gap-3">
-            {/* Exceptions quick badge */}
+            {/* Exceptions quick badge (office staff only) */}
+            {isOfficeRole(currentUser.role) && (
             <button
               onClick={() => onNavigateToTab && onNavigateToTab('exceptions')}
               className="relative p-2 text-slate-600 hover:text-brand-600 hover:bg-slate-100 rounded-lg transition-colors"
-              title="Action Required Center"
+              title="Problems to fix"
+              aria-label={`Problems to fix: ${openExceptionsCount} open`}
             >
               <Bell className="w-5 h-5" />
               {openExceptionsCount > 0 && (
@@ -143,11 +149,13 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onSearchSelect, onNavigate
                 </span>
               )}
             </button>
+            )}
 
-            {/* Reset Seed Data Button */}
+            {/* Reset Seed Data Button — demo only, Super Admin only */}
+            {currentUser.role === 'Super Admin' && (
             <button
               onClick={() => {
-                if (window.confirm('Reset all demo data back to clean factory state?')) {
+                if (window.confirm('This deletes ALL changes and puts back the demo data. This cannot be undone. Continue?')) {
                   resetAllData();
                 }
               }}
@@ -156,6 +164,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onSearchSelect, onNavigate
             >
               <RotateCcw className="w-4 h-4" />
             </button>
+            )}
 
             {/* Active Persona / Role Switcher */}
             <div className="relative">
