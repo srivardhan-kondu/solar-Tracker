@@ -1,7 +1,8 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { AlertTriangle, Languages, Loader2, LogIn } from 'lucide-react';
+import { AlertTriangle, Building2, Languages, Loader2, LogIn, Mail, Phone } from 'lucide-react';
+import { COMPANY } from '@/lib/company';
 import { useLang } from '@/i18n/LanguageContext';
 import { Logo } from '@/components/brand/Logo';
 import { User } from '@/types';
@@ -202,7 +203,35 @@ const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </button>
         </div>
         {children}
+        <CompanyCard />
       </div>
+    </div>
+  );
+};
+
+/** Who runs this app, shown on the sign-in screen */
+const CompanyCard: React.FC = () => {
+  const { t } = useLang();
+  return (
+    <div className="border-t border-slate-200 pt-4 space-y-1.5 text-sm text-slate-700">
+      <div className="flex items-center gap-2 text-base font-bold text-slate-900">
+        <Building2 className="w-5 h-5 text-brand-600 flex-shrink-0" />
+        {COMPANY.name}
+      </div>
+      <div>
+        <span className="text-slate-500">{t('GSTIN:')}</span> <span className="font-mono">{COMPANY.gstin}</span>
+      </div>
+      <div>
+        <span className="text-slate-500">{t('Contact:')}</span> {COMPANY.contactPerson}, {COMPANY.designation}
+      </div>
+      <a href={`tel:+91${COMPANY.phone}`} className="flex items-center gap-2 text-brand-700 font-semibold py-1">
+        <Phone className="w-4 h-4 flex-shrink-0" />
+        {COMPANY.phone}
+      </a>
+      <a href={`mailto:${COMPANY.email.toLowerCase()}`} className="flex items-center gap-2 text-brand-700 font-semibold break-all py-1">
+        <Mail className="w-4 h-4 flex-shrink-0" />
+        {COMPANY.email}
+      </a>
     </div>
   );
 };

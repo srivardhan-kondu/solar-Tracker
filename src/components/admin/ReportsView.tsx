@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { APP_NAME } from '@/lib/company';
 import { useLang } from '@/i18n/LanguageContext';
 import {
   FileText,
@@ -241,7 +242,7 @@ export const ReportsView: React.FC = () => {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-4">
         <div className="border-b border-slate-200 pb-4 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-2">
           <div>
-            <div className="text-sm font-bold text-brand-700">{t("Solar Tracker")}</div>
+            <div className="text-sm font-bold text-brand-700">{APP_NAME}</div>
             <h2 className="text-lg font-bold text-slate-900 mt-0.5">
               {t(reportList.find((r) => r.id === activeReport)?.title || '')}
             </h2>

@@ -1,3 +1,6 @@
+/** The app's name, shown in the top bar, browser tab and sign-in screen */
+export const APP_NAME = 'Arka Works';
+
 /** Our company: the EPC contractor / RTS vendor named on the consumer consent form */
 export const COMPANY = {
   name: 'ARKA WORKS',

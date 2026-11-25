@@ -5,6 +5,7 @@ import { useLang } from '@/i18n/LanguageContext';
 import { KeyRound, MapPin } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { ROLE_LABEL } from '@/lib/access';
+import { APP_NAME } from '@/lib/company';
 import { User } from '@/types';
 import { villageLabel, villagesOf } from '@/lib/workArea';
 
@@ -19,7 +20,7 @@ export const UserManagementView: React.FC = () => {
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t("Users")}</h1>
-          <p className="text-sm text-slate-500 mt-0.5">{t("Everyone who uses Solar Tracker, and what kind of work they do.")}</p>
+          <p className="text-sm text-slate-500 mt-0.5">{t("Everyone who uses {app}, and what kind of work they do.", { app: APP_NAME })}</p>
         </div>
 
         <div className="text-sm font-semibold text-slate-600">{t("Signed in as:")}{" "}<span className="font-bold text-slate-900">{currentUser.name} ({t(ROLE_LABEL[currentUser.role])})</span>

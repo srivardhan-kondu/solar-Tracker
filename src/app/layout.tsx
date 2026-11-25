@@ -4,6 +4,7 @@ import "./globals.css";
 import { AppProvider } from "@/context/AppContext";
 import { LanguageProvider } from "@/i18n/LanguageContext";
 import { AuthGate } from "@/components/auth/AuthGate";
+import { APP_NAME } from "@/lib/company";
 
 // Atkinson Hyperlegible: designed by the Braille Institute for readers with low vision.
 const appFont = Atkinson_Hyperlegible({
@@ -22,7 +23,7 @@ const teluguFont = Noto_Sans_Telugu({
 });
 
 export const metadata: Metadata = {
-  title: "Solar Tracker",
+  title: APP_NAME,
   description: "Track rooftop solar installations, stock, DCR numbers and service complaints.",
 };
 

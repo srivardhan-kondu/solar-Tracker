@@ -597,7 +597,7 @@ export const TE: Record<string, string> = {
   'Close complaint': 'ఫిర్యాదు మూసివేయండి',
 
   // ---------- Users ----------
-  'Everyone who uses Solar Tracker, and what kind of work they do.': 'Solar Tracker వాడే సిబ్బంది అందరూ, వారు చేసే పని.',
+  'Everyone who uses {app}, and what kind of work they do.': '{app} వాడే సిబ్బంది అందరూ, వారు చేసే పని.',
   'Username:': 'యూజర్‌నేమ్:',
   'Last active:': 'చివరిసారి వాడింది:',
 
@@ -882,4 +882,6 @@ export const TE: Record<string, string> = {
   '{n} change(s) were not accepted by the server.': '{n} మార్పులను సర్వర్ అంగీకరించలేదు.',
   'This home is not assigned to you': 'ఈ ఇల్లు మీకు కేటాయించలేదు',
   'The office has not given you any villages yet': 'ఆఫీసు మీకు ఇంకా ఏ గ్రామాన్నీ ఇవ్వలేదు',
+  'GSTIN:': 'GSTIN:',
+  'Contact:': 'సంప్రదించండి:',
 };
