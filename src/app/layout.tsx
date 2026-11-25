@@ -3,6 +3,7 @@ import { Atkinson_Hyperlegible, Noto_Sans_Telugu } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from "@/context/AppContext";
 import { LanguageProvider } from "@/i18n/LanguageContext";
+import { AuthGate } from "@/components/auth/AuthGate";
 
 // Atkinson Hyperlegible: designed by the Braille Institute for readers with low vision.
 const appFont = Atkinson_Hyperlegible({
@@ -40,7 +41,9 @@ export default function RootLayout({
     <html lang="en" className={`${appFont.variable} ${teluguFont.variable}`}>
       <body className="font-sans antialiased min-h-screen bg-slate-50 text-slate-900">
         <LanguageProvider>
-          <AppProvider>{children}</AppProvider>
+          <AuthGate>
+            <AppProvider>{children}</AppProvider>
+          </AuthGate>
         </LanguageProvider>
       </body>
     </html>

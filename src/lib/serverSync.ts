@@ -15,8 +15,6 @@ import { AllData, chronological, CollectionKey, DbRecord, TABLE_NAMES, TableChan
 
 export type SyncState = 'loading' | 'saved' | 'saving' | 'not_saved';
 
-type Pending = Partial<Record<TableName, { upserts: DbRecord[]; deletes: string[] }>>;
-
 const PENDING_KEY = 'SOLAR_TRACKER_PENDING_V1';
 const IMPORTED_KEY = 'SOLAR_TRACKER_IMPORTED_V1';
 // Where the app kept everything before the database existed
@@ -37,6 +35,31 @@ const readJson = <T,>(key: string): T | null => {
 };
 
 const isEmpty = (p: Pending) => Object.values(p).every((c) => !c || (c.upserts.length === 0 && c.deletes.length === 0));
+
+/** A change the server would not accept, e.g. a home outside an installer's work area */
+export interface Refusal {
+  table: TableName;
+  id: string;
+  reason: string;
+}
+
+/** True when this device has work not yet sent to the server */
+export const hasUnsentWork = () => {
+  const p = readJson<Pending>(PENDING_KEY);
+  return !!p && !isEmpty(p);
+};
+
+/** Forget unsent work (only when the person chooses to discard it) */
+export const discardUnsentWork = () => {
+  try {
+    localStorage.removeItem(PENDING_KEY);
+  } catch {
+    /* ignore */
+  }
+};
+
+type Pending = Partial<Record<TableName, { upserts: DbRecord[]; deletes: string[] }>>;
+
 
 /** Add newer changes on top of older ones. The newest version of a record wins. */
 const merge = (older: Pending, newer: Pending): Pending => {
@@ -92,10 +115,16 @@ export const useServerSync = ({
   collections,
   setters,
   paused,
+  onSignedOut,
+  onRefused,
 }: {
   collections: AllData;
   setters: Record<CollectionKey, (rows: DbRecord[]) => void>;
   paused: boolean;
+  /** The server no longer knows who this is (signed out elsewhere, or 30 days passed) */
+  onSignedOut: () => void;
+  /** Some changes were not accepted and will not be sent again */
+  onRefused: (refused: Refusal[]) => void;
 }) => {
   const [syncState, setSyncState] = useState<SyncState>('loading');
   // Read the old device data during the first render, before anything overwrites it
@@ -113,6 +142,8 @@ export const useServerSync = ({
   settersRef.current = setters;
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
+  const callbacks = useRef({ onSignedOut, onRefused });
+  callbacks.current = { onSignedOut, onRefused };
 
   const savePending = () => {
     try {
@@ -154,7 +185,16 @@ export const useServerSync = ({
         // The server will never accept this batch; keeping it would block every later save
         console.error('Server refused changes', await res.text());
         ok = true;
-      } else ok = res.ok;
+      } else if (res.status === 401) {
+        ok = false; // kept on this device until the same person signs in again
+        callbacks.current.onSignedOut();
+      } else {
+        ok = res.ok;
+        if (ok) {
+          const { refused } = (await res.json().catch(() => ({}))) as { refused?: Refusal[] };
+          if (refused?.length) callbacks.current.onRefused(refused);
+        }
+      }
     } catch {
       ok = false;
     }
@@ -172,6 +212,7 @@ export const useServerSync = ({
     const timer = setTimeout(() => ctrl.abort(), LOAD_TIMEOUT_MS);
     try {
       const res = await fetch('/api/data', { cache: 'no-store', signal: ctrl.signal });
+      if (res.status === 401) callbacks.current.onSignedOut();
       if (!res.ok) return false;
       const data = (await res.json()) as AllData;
       // Something changed here while loading: keep the local work, load again later

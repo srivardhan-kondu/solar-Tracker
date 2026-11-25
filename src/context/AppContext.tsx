@@ -16,6 +16,7 @@ import {
   GpsLocation,
   SiteSurvey,
   GeoTag,
+  Village,
 } from '@/types';
 import {
   SEED_USERS,
@@ -30,7 +31,9 @@ import {
 } from '@/data/seedData';
 import { useLang } from '@/i18n/LanguageContext';
 import { canInstall, reopenBlocker, surveyMissing } from '@/lib/survey';
-import { SyncState, uploadPhoto, useServerSync } from '@/lib/serverSync';
+import { Refusal, SyncState, uploadPhoto, useServerSync } from '@/lib/serverSync';
+import { useAuth } from '@/components/auth/AuthGate';
+import { villageLabel } from '@/lib/workArea';
 import { hasGeo } from '@/lib/geoPhoto';
 import { normalizeMobile, sameMobile } from '@/lib/mobile';
 import { resumeStep } from '@/lib/installationSteps';
@@ -54,13 +57,19 @@ interface AppContextType {
   activeStep: number;
   selectedConsumerFor360: Consumer | null;
   surveys: SiteSurvey[];
+  /** Villages set up by the office: name and geofence circle */
+  villages: Village[];
+  /** Work the server would not accept since the last time the notice was closed */
+  refusedChanges: Refusal[];
+  clearRefusedChanges: () => void;
   /** True when the browser refused to save (storage full), so recent work may be lost on refresh */
   storageFull: boolean;
   /** Whether everything has been saved to the server */
   syncState: SyncState;
 
   // Setters & Actions
-  setCurrentUser: (user: User) => void;
+  /** Sign out. Returns false (and does nothing) while this phone has work not yet sent. */
+  signOut: () => Promise<boolean>;
   setAppMode: (mode: 'admin' | 'mobile' | 'split') => void;
   setIsOnline: (online: boolean) => void;
   setSelectedConsumerFor360: (consumer: Consumer | null) => void;
@@ -78,6 +87,12 @@ interface AppContextType {
   uploadConsumers: (newConsumers: Consumer[]) => { inserted: number; updated: number };
   uploadInventory: (items: EquipmentInventory[]) => { inserted: number; duplicateSerials: string[] };
   assignConsumersToInstaller: (consumerNumbers: string[], installerId: string) => void;
+  /** Office: choose the villages an installer may work in (replaces their previous villages) */
+  setInstallerVillages: (installerId: string, villageIds: string[]) => void;
+  /** Office: add a village, or change its name or geofence (pass its id) */
+  saveVillage: (v: Omit<Village, 'id' | 'updatedBy' | 'updatedAt'> & { id?: string }) => void;
+  /** Office: remove a village; it is taken away from every installer who had it */
+  removeVillage: (id: string) => void;
   reconcileDCRFile: (records: { ula: string; dcrNumber: string }[], fileName: string) => { matched: number; unmatched: number; conflicts: number };
   createServiceTicket: (ticket: Omit<ServiceTicket, 'id' | 'ticketNumber' | 'createdAt' | 'visitPhotos'>) => void;
   updateServiceTicketStatus: (ticketId: string, status: ServiceTicket['status'], notes?: string, photos?: string[]) => void;
@@ -106,8 +121,12 @@ const SURVEY_STORAGE_KEY = 'SOLAR_TRACKER_SURVEYS_V1';
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Messages shown to people are translated; audit records stay in English.
   const { t } = useLang();
+  const { user: sessionUser, signOut, signedOutByServer } = useAuth();
   const [users, setUsers] = useState<User[]>(SEED_USERS);
-  const [currentUser, setCurrentUser] = useState<User>(SEED_USERS[0]); // Default Rajesh Varma (Super Admin)
+  // The signed-in person, kept up to date when the office changes them (e.g. their work area)
+  const currentUser = users.find((u) => u.id === sessionUser.id) ?? sessionUser;
+  const [villages, setVillages] = useState<Village[]>([]);
+  const [refusedChanges, setRefusedChanges] = useState<Refusal[]>([]);
   const [consumers, setConsumers] = useState<Consumer[]>(SEED_CONSUMERS);
   const [inventory, setInventory] = useState<EquipmentInventory[]>(SEED_INVENTORY);
   const [installations, setInstallations] = useState<Installation[]>(SEED_INSTALLATIONS);
@@ -139,6 +158,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (parsed.serviceTickets) setServiceTickets(parsed.serviceTickets);
         if (parsed.exceptions) setExceptions(parsed.exceptions);
         if (parsed.auditLogs) setAuditLogs(parsed.auditLogs);
+        if (parsed.villages) setVillages(parsed.villages);
         if (parsed.offlineQueue) setOfflineQueue(parsed.offlineQueue);
         if (parsed.installerDraft) {
           setInstallerDraft(parsed.installerDraft);
@@ -165,6 +185,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         serviceTickets,
         exceptions,
         auditLogs,
+        villages,
         offlineQueue,
         // Keep the in-progress installation so a page refresh never loses field work
         installerDraft,
@@ -176,7 +197,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // quota or private mode
       setMainStorageFull(true);
     }
-  }, [users, consumers, inventory, installations, dcrRecords, serviceTickets, exceptions, auditLogs, offlineQueue, installerDraft, activeStep]);
+  }, [users, consumers, inventory, installations, dcrRecords, serviceTickets, exceptions, auditLogs, villages, offlineQueue, installerDraft, activeStep]);
 
   useEffect(() => {
     try {
@@ -217,6 +238,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const startOrResumeInstallation = (consumerNumber: string) => {
     const consumer = consumers.find((c) => c.consumerNumber === consumerNumber);
     if (!consumer) return;
+    // Installers work only on their own homes
+    if (currentUser.role === 'Installer' && consumer.assignedInstallerId !== currentUser.id) return;
     // A home is installed only after the site survey says it is feasible
     if (!canInstall(surveys, installations, consumerNumber)) return;
 
@@ -752,6 +775,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+  // ---------- Villages and who may work in them (office only) ----------
+  const stamp = () => new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+  const namesOf = (ids?: string[]) => {
+    const list = (ids ?? []).map((id) => villages.find((v) => v.id === id)).filter(Boolean) as Village[];
+    return list.length ? list.map(villageLabel).join(', ') : 'No villages';
+  };
+
+  const setInstallerVillages = (installerId: string, villageIds: string[]) => {
+    const installer = users.find((u) => u.id === installerId);
+    if (!installer) return;
+    const ids = Array.from(new Set(villageIds)).filter((id) => villages.some((v) => v.id === id));
+    setUsers((prev) =>
+      prev.map((u) => (u.id === installerId ? { ...u, villageIds: ids, accessUpdatedBy: currentUser.name, accessUpdatedAt: stamp() } : u))
+    );
+    logAudit('SET_VILLAGE_ACCESS', 'User', installerId, `Villages of ${installer.name} changed by ${currentUser.name}.`, namesOf(installer.villageIds), namesOf(ids));
+  };
+
+  const saveVillage = (v: Omit<Village, 'id' | 'updatedBy' | 'updatedAt'> & { id?: string }) => {
+    const before = v.id ? villages.find((x) => x.id === v.id) : undefined;
+    const village: Village = {
+      ...v,
+      name: v.name.trim(),
+      mandal: v.mandal?.trim() || undefined,
+      district: v.district?.trim() || undefined,
+      id: before?.id ?? `vil_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      updatedBy: currentUser.name,
+      updatedAt: stamp(),
+    };
+    setVillages((prev) => [...prev.filter((x) => x.id !== village.id), village]);
+    const where = (x?: Village) => (x ? `${villageLabel(x)}: ${x.latitude.toFixed(6)}, ${x.longitude.toFixed(6)} within ${x.radiusM} m` : 'None');
+    logAudit(before ? 'UPDATE_VILLAGE' : 'ADD_VILLAGE', 'Village', village.id, `Village ${village.name} ${before ? 'changed' : 'added'} by ${currentUser.name}.`, where(before), where(village));
+  };
+
+  const removeVillage = (id: string) => {
+    const before = villages.find((v) => v.id === id);
+    if (!before) return;
+    const had = users.filter((u) => u.villageIds?.includes(id));
+    setVillages((prev) => prev.filter((v) => v.id !== id));
+    if (had.length) {
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.villageIds?.includes(id)
+            ? { ...u, villageIds: u.villageIds.filter((x) => x !== id), accessUpdatedBy: currentUser.name, accessUpdatedAt: stamp() }
+            : u
+        )
+      );
+    }
+    logAudit(
+      'REMOVE_VILLAGE',
+      'Village',
+      id,
+      `Village ${villageLabel(before)} removed by ${currentUser.name}.` + (had.length ? ` Taken away from: ${had.map((u) => u.name).join(', ')}.` : '')
+    );
+  };
+
   // DCR Reconciliation (FR-DCR-001 to 010)
   const reconcileDCRFile = (
     records: { ula: string; dcrNumber: string }[],
@@ -1013,6 +1091,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ---------- Site survey ----------
   const updateSurveyDraft = (consumerNumber: string, change: (s: SiteSurvey) => SiteSurvey) => {
+    const consumer = consumers.find((c) => c.consumerNumber === consumerNumber);
+    if (currentUser.role === 'Installer' && consumer?.assignedInstallerId !== currentUser.id) return;
     setSurveys((prev) => {
       const existing = prev.find((s) => s.consumerNumber === consumerNumber);
       if (existing?.status === 'Submitted') return prev; // sent surveys cannot be changed
@@ -1175,6 +1255,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       exceptions,
       auditLogs,
       surveys,
+      villages,
     } as unknown as AllData,
     setters: {
       users: setUsers,
@@ -1186,8 +1267,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       exceptions: setExceptions,
       auditLogs: setAuditLogs,
       surveys: setSurveys,
+      villages: setVillages,
     } as unknown as Record<CollectionKey, (rows: DbRecord[]) => void>,
     paused: !isOnline,
+    onSignedOut: signedOutByServer,
+    onRefused: (r) => setRefusedChanges((prev) => [...prev, ...r]),
   });
 
   // Try failed photo uploads again now and then
@@ -1274,7 +1358,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch {
       return false;
     }
-    setCurrentUser(SEED_USERS[0]);
     setOfflineQueue([]);
     setInstallerDraft(null);
     setActiveStep(1);
@@ -1300,9 +1383,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeStep,
         selectedConsumerFor360,
         surveys,
+        villages,
+        refusedChanges,
+        clearRefusedChanges: () => setRefusedChanges([]),
         storageFull: mainStorageFull || surveyStorageFull,
         syncState,
-        setCurrentUser,
+        signOut,
         setAppMode,
         setIsOnline,
         setSelectedConsumerFor360,
@@ -1320,6 +1406,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         uploadConsumers,
         uploadInventory,
         assignConsumersToInstaller,
+        setInstallerVillages,
+        saveVillage,
+        removeVillage,
         reconcileDCRFile,
         createServiceTicket,
         updateServiceTicketStatus,

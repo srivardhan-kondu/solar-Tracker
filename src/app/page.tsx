@@ -8,6 +8,7 @@ import { DashboardView } from '@/components/admin/DashboardView';
 import { ConsumerSearchView } from '@/components/admin/ConsumerSearchView';
 import { MasterDataUploadView } from '@/components/admin/MasterDataUploadView';
 import { AssignmentView } from '@/components/admin/AssignmentView';
+import { VillagesAccessView } from '@/components/admin/VillagesAccessView';
 import { InventoryView } from '@/components/admin/InventoryView';
 import { DCRModuleView } from '@/components/admin/DCRModuleView';
 import { ActionRequiredView } from '@/components/admin/ActionRequiredView';
@@ -24,7 +25,7 @@ import { CloudOff, Loader2 } from 'lucide-react';
 
 export default function Home() {
   const { t } = useLang();
-  const { currentUser, consumers, selectedConsumerFor360, setSelectedConsumerFor360, syncState } = useApp();
+  const { currentUser, consumers, selectedConsumerFor360, setSelectedConsumerFor360, syncState, refusedChanges, clearRefusedChanges } = useApp();
   const [currentTab, setCurrentTab] = useState<string>(HOME_TAB_FOR_ROLE[currentUser.role]);
   // Status filter carried into the installations list (e.g. from a dashboard card)
   const [installationsFilter, setInstallationsFilter] = useState<string>('All');
@@ -70,6 +71,20 @@ export default function Home() {
         </div>
       )}
 
+      {refusedChanges.length > 0 && (
+        <div className="no-print bg-red-50 border-b-2 border-red-200 text-red-950 px-4 py-2.5 text-base" role="alert">
+          <div className="max-w-[1480px] mx-auto flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="font-bold">
+              {t('{n} change(s) were not accepted by the server.', { n: refusedChanges.length })}
+            </span>
+            <span>{t(refusedChanges[0].reason)}</span>
+            <button onClick={clearRefusedChanges} className="ml-auto px-3 py-1.5 rounded-lg bg-white border border-red-300 font-bold text-red-800">
+              {t('OK')}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Body */}
       <div className="flex-1 flex max-w-[1480px] w-full mx-auto">
         {/* Left Sidebar */}
@@ -94,6 +109,13 @@ export default function Home() {
           {show('master_upload') && <MasterDataUploadView />}
 
           {show('assignments') && <AssignmentView />}
+
+          {show('village_access') && (
+            <div className="space-y-6">
+              <h1 className="text-xl font-bold text-slate-900">{t('Villages & Access')}</h1>
+              <VillagesAccessView />
+            </div>
+          )}
 
           {show('inventory') && <InventoryView />}
 

@@ -6,6 +6,9 @@ import { useLang } from '@/i18n/LanguageContext';
 import { GeoTag } from '@/types';
 import { captureStampedFrame } from '@/lib/geoPhoto';
 import { MAX_FIX_AGE_MS, MAX_PHOTO_ACCURACY_M } from '@/lib/photoRules';
+import { useApp } from '@/context/AppContext';
+import { checkVillages, formatDistance } from '@/lib/fence';
+import { isLimitedToVillages, villageLabel, villagesOf } from '@/lib/workArea';
 
 export interface CapturedPhoto {
   url: string;
@@ -20,6 +23,7 @@ type Fix = { latitude: number; longitude: number; accuracy: number; at: number }
  * Full-screen camera inside the app. This is the only way to add a photo:
  * there is no file picker, so photos cannot be uploaded from the phone's gallery or a computer.
  * The shutter works only once the phone knows where it is, and the location is printed on the photo.
+ * For installers, the shutter also works only inside one of the villages the office gave them.
  */
 export const CameraCapture: React.FC<{
   /** Printed on the photo, e.g. "AP-GNT-2026-003 · Roof photo 1" */
@@ -31,6 +35,9 @@ export const CameraCapture: React.FC<{
   onClose: () => void;
 }> = ({ stampLabel, stampAddress, title, onCapture, onClose }) => {
   const { t } = useLang();
+  const { currentUser, villages } = useApp();
+  const limited = isLimitedToVillages(currentUser);
+  const myVillages = limited ? villagesOf(currentUser, villages) : [];
   const videoRef = useRef<HTMLVideoElement>(null);
   const [attempt, setAttempt] = useState(0);
   const [cameraReady, setCameraReady] = useState(false);
@@ -147,11 +154,14 @@ export const CameraCapture: React.FC<{
   const recentFix = fix && now - fix.at < MAX_FIX_AGE_MS ? fix : null;
   // Only a precise, fresh location is printed on a photo
   const freshFix = recentFix && recentFix.accuracy <= MAX_PHOTO_ACCURACY_M ? recentFix : null;
-  const canShoot = cameraReady && !!freshFix && !shot;
+  // Installers: only inside one of their villages
+  const where = limited && freshFix ? checkVillages(freshFix, myVillages) : null;
+  const outside = limited && (!myVillages.length || (where !== null && !where.inside));
+  const canShoot = cameraReady && !!freshFix && !outside && !shot;
 
   const takePhoto = () => {
     const v = videoRef.current;
-    if (!v || !freshFix || !v.videoWidth) return;
+    if (!v || !freshFix || !v.videoWidth || outside) return;
     try {
       const clockChecked = clockOffset !== null;
       const takenAt = Date.now() + (clockOffset ?? 0);
@@ -225,13 +235,25 @@ export const CameraCapture: React.FC<{
       {/* Location status */}
       <div
         className={`px-4 py-2.5 text-sm font-semibold flex items-center gap-2 ${
-          freshFix ? 'bg-emerald-700' : geoBlocked ? 'bg-red-700' : 'bg-amber-600'
+          freshFix && !outside ? 'bg-emerald-700' : geoBlocked || outside ? 'bg-red-700' : 'bg-amber-600'
         }`}
         role="status"
       >
         <MapPin className="w-5 h-5 flex-shrink-0" />
-        {freshFix ? (
+        {limited && !myVillages.length ? (
+          <span>{t('The office has not given you any villages yet. Call the office.')}</span>
+        ) : freshFix && where && !where.inside ? (
           <span>
+            {where.nearest
+              ? t('You are {d} outside {place}. You can only take photos inside your villages.', {
+                  d: formatDistance(where.nearest.metres),
+                  place: villageLabel(where.nearest.village),
+                })
+              : t('You are outside your villages.')}
+          </span>
+        ) : freshFix ? (
+          <span>
+            {where?.inside && <>{t('Inside {place}', { place: villageLabel(where.inside) })} · </>}
             {t('Location found')}: {freshFix.latitude.toFixed(5)}, {freshFix.longitude.toFixed(5)} · ±{Math.round(freshFix.accuracy)} m
           </span>
         ) : recentFix ? (

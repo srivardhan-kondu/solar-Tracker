@@ -7,6 +7,7 @@ export type TabId =
   | 'installations'
   | 'master_upload'
   | 'assignments'
+  | 'village_access'
   | 'inventory'
   | 'dcr_module'
   | 'exceptions'
@@ -22,6 +23,7 @@ const ALL_TABS: TabId[] = [
   'installations',
   'master_upload',
   'assignments',
+  'village_access',
   'inventory',
   'dcr_module',
   'exceptions',

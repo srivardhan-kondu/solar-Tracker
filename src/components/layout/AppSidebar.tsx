@@ -18,9 +18,10 @@ import {
   MoreHorizontal,
   X,
   ClipboardCheck,
+  MapPin,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import { canSeeTab } from '@/lib/access';
+import { canSeeTab, isOfficeRole } from '@/lib/access';
 import { needsSurvey } from '@/lib/survey';
 
 interface AppSidebarProps {
@@ -30,7 +31,7 @@ interface AppSidebarProps {
 
 export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTab }) => {
   const { t } = useLang();
-  const { exceptions, dcrRecords, currentUser, consumers, surveys, installations } = useApp();
+  const { exceptions, dcrRecords, currentUser, consumers, surveys, installations, users } = useApp();
   const [moreOpen, setMoreOpen] = useState(false);
 
   // Esc closes the "More" sheet
@@ -47,6 +48,10 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTa
       ? consumers.filter((c) => c.assignedInstallerId === currentUser.id && needsSurvey(c, surveys, installations)).length
       : 0;
   const openExceptionsCount = exceptions.filter((e) => e.status === 'Open').length;
+  // Office: installers who have no village yet, so cannot work
+  const installersWithoutVillages = isOfficeRole(currentUser.role)
+    ? users.filter((u) => u.role === 'Installer' && u.status === 'Active' && !u.villageIds?.length).length
+    : 0;
   const dcrPendingCount = dcrRecords.filter((d) => d.status === 'ULA Not Found' || d.status === 'Existing Value Conflict').length;
 
   const menuItems = [
@@ -92,6 +97,13 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ currentTab, setCurrentTa
       short: 'Assign',
       icon: UserPlus,
       badge: undefined,
+    },
+    {
+      id: 'village_access',
+      label: 'Villages & Access',
+      short: 'Villages',
+      icon: MapPin,
+      badge: installersWithoutVillages > 0 ? installersWithoutVillages : undefined,
     },
     {
       id: 'inventory',

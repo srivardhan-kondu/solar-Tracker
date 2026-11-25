@@ -19,6 +19,8 @@ import { STATUS_GROUPS, matchesStatusFilter, uniqueSorted } from '@/lib/status';
 
 const pct = (part: number, total: number) => (total > 0 ? Math.round((part / total) * 100) : 0);
 
+import { VillagesAccessView } from './VillagesAccessView';
+
 export const DashboardView: React.FC<{
   onNavigateToTab: (tab: string, statusFilter?: string) => void;
 }> = ({ onNavigateToTab }) => {
@@ -167,6 +169,9 @@ export const DashboardView: React.FC<{
           );
         })}
       </div>
+
+      {/* Villages and who may work in them: change with one click */}
+      <VillagesAccessView />
 
       {/* Second Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

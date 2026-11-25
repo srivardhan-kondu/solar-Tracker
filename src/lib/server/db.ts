@@ -112,6 +112,14 @@ const COLUMNS: Record<TableName, [name: string, type: string, expr: string][]> =
     ['roof_type', 'text', "r->>'roofType'"],
     ['shade_level', 'text', "r->>'shadeLevel'"],
   ],
+  villages: [
+    ['name', 'text', "r->>'name'"],
+    ['mandal', 'text', "r->>'mandal'"],
+    ['district', 'text', "r->>'district'"],
+    ['latitude', 'double precision', "(r->>'latitude')::double precision"],
+    ['longitude', 'double precision', "(r->>'longitude')::double precision"],
+    ['radius_m', 'double precision', "(r->>'radiusM')::double precision"],
+  ],
 };
 
 const INDEXED = ['consumer_number', 'status', 'record_id', 'serial_number'];
@@ -131,6 +139,8 @@ const schemaStatements = (): string[] => {
     for (const [n] of COLUMNS[t]) if (INDEXED.includes(n)) out.push(`create index if not exists ${t}_${n}_idx on ${t} (${n})`);
   }
   out.push(...PHOTO_SCHEMA);
+  // Sign-in PINs (hashed). Kept out of the app's tables so they are never sent to any phone.
+  out.push('create table if not exists user_pins (user_id text primary key, pin_hash text not null, updated_at timestamptz not null default now())');
   return out;
 };
 
@@ -176,6 +186,7 @@ const SEED: Record<TableName, DbRecord[]> = {
   exceptions: SEED_EXCEPTIONS as unknown as DbRecord[],
   audit_logs: SEED_AUDIT_LOGS as unknown as DbRecord[],
   surveys: SEED_SURVEYS as unknown as DbRecord[],
+  villages: [],
 };
 
 const seedQueries = () => TABLE_NAMES.map((t) => upsertQuery(t, chronological(t, SEED[t])));

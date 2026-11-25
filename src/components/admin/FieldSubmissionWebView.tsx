@@ -26,6 +26,8 @@ import {
   REQUIRED_PHOTOS,
 } from '@/lib/installationSteps';
 import { CameraCapture, CapturedPhoto } from '@/components/camera/CameraCapture';
+import { checkVillages, formatDistance } from '@/lib/fence';
+import { isLimitedToVillages, villageLabel, villagesOf } from '@/lib/workArea';
 import { consumerAddress, distanceMetres, formatGeo, hasGeo, mapsLink } from '@/lib/geoPhoto';
 import { canInstall, needsSurvey } from '@/lib/survey';
 
@@ -102,6 +104,7 @@ export const FieldSubmissionWebView: React.FC<{
     surveys,
     installations,
     updateConsumerMobile,
+    villages,
   } = useApp();
 
   // Installers see only their own jobs; office staff see every open job.
@@ -191,6 +194,24 @@ export const FieldSubmissionWebView: React.FC<{
     if (!best) {
       setGpsError(t('Could not find your location. Turn on location (GPS) on the phone, stand outside near the panels, and try again.'));
       return;
+    }
+    // Installers: the location must be inside one of the villages the office gave them
+    if (isLimitedToVillages(currentUser)) {
+      const mine = villagesOf(currentUser, villages);
+      const r = checkVillages(best, mine);
+      if (!r.inside) {
+        setGpsError(
+          !mine.length
+            ? t('The office has not given you any villages yet. Call the office.')
+            : r.nearest
+            ? t('You are {d} outside {place}. You can only work inside your villages.', {
+                d: formatDistance(r.nearest.metres),
+                place: villageLabel(r.nearest.village),
+              })
+            : t('You are outside your villages.')
+        );
+        return;
+      }
     }
     const gps: GpsLocation = {
       latitude: best.latitude,

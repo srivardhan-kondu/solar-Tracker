@@ -12,6 +12,7 @@ export const TABLES = {
   exceptions: { collection: 'exceptions', newestFirst: true },
   audit_logs: { collection: 'auditLogs', newestFirst: true },
   surveys: { collection: 'surveys', newestFirst: true },
+  villages: { collection: 'villages', newestFirst: false },
 } as const;
 
 export type TableName = keyof typeof TABLES;

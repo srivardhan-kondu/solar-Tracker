@@ -11,6 +11,28 @@ export interface User {
   status: 'Active' | 'Inactive';
   lastLogin: string;
   avatar?: string;
+  /** Installers only: the villages the office allows them to work in. None = cannot work anywhere. */
+  villageIds?: string[];
+  accessUpdatedBy?: string;
+  accessUpdatedAt?: string;
+}
+
+/**
+ * A village the office lets installers work in: its name and a circle on the ground (the geofence).
+ * Set up by the office only. An installer can take survey and installation photos only inside
+ * the circles of the villages they are allowed.
+ */
+export interface Village {
+  id: string;
+  name: string;
+  mandal?: string;
+  district?: string;
+  latitude: number;
+  longitude: number;
+  /** How far from the centre point still counts as the village */
+  radiusM: number;
+  updatedBy: string;
+  updatedAt: string;
 }
 
 export type InstallationStatus =
@@ -276,7 +298,7 @@ export interface AuditEvent {
   actorName: string;
   actorRole: UserRole;
   action: string;
-  recordType: 'Installation' | 'Consumer' | 'Inventory' | 'DCR' | 'ServiceTicket' | 'User' | 'Assignment';
+  recordType: 'Installation' | 'Consumer' | 'Inventory' | 'DCR' | 'ServiceTicket' | 'User' | 'Assignment' | 'Village';
   recordId: string;
   timestamp: string;
   details: string;

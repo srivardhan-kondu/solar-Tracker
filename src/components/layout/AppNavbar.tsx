@@ -2,12 +2,12 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useLang } from '@/i18n/LanguageContext';
-import { Search, AlertTriangle, RotateCcw, ChevronDown, Check, X, Languages } from 'lucide-react';
+import { Search, AlertTriangle, RotateCcw, ChevronDown, X, Languages, LogOut, MapPin } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { isOfficeRole, ROLE_LABEL } from '@/lib/access';
 import { STATUS_LABEL } from '@/lib/status';
 import { Logo } from '@/components/brand/Logo';
-import { UserRole } from '@/types';
+import { villageLabel, villagesOf } from '@/lib/workArea';
 
 
 interface AppNavbarProps {
@@ -16,8 +16,8 @@ interface AppNavbarProps {
 
 export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
   const { t, lang, toggleLang } = useLang();
-  const { currentUser, setCurrentUser, users, exceptions, consumers, setSelectedConsumerFor360, resetAllData } =
-    useApp();
+  const { currentUser, signOut, exceptions, consumers, villages, setSelectedConsumerFor360, resetAllData } = useApp();
+  const [signOutBlocked, setSignOutBlocked] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -177,7 +177,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
                 onClick={() => setShowRoleMenu(!showRoleMenu)}
                 aria-haspopup="menu"
                 aria-expanded={showRoleMenu}
-                aria-label={t('Signed in as {name}. Switch user', { name: currentUser.name })}
+                aria-label={t('Signed in as {name}. Open menu', { name: currentUser.name })}
                 className="flex items-center gap-3 p-1 sm:py-1.5 sm:pl-1.5 sm:pr-3 bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-xl"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -192,10 +192,15 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
               {showRoleMenu && (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-2 w-[min(20rem,calc(100vw-2rem))] bg-white rounded-xl shadow-2xl border-2 border-slate-200 py-2 z-50"
+                  className="absolute right-0 mt-2 w-[min(20rem,calc(100vw-2rem))] bg-white rounded-xl shadow-2xl border-2 border-slate-200 p-4 z-50 space-y-3"
                 >
-                  <div className="px-4 py-2 flex items-center justify-between">
-                    <span className="text-base font-bold text-slate-900">{t("Switch user")}</span>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="text-base font-bold text-slate-900">{currentUser.name}</div>
+                      <div className="text-sm text-slate-600">
+                        {t(ROLE_LABEL[currentUser.role])} · <span className="font-mono">{currentUser.username}</span>
+                      </div>
+                    </div>
                     <button
                       onClick={() => setShowRoleMenu(false)}
                       aria-label={t("Close")}
@@ -204,32 +209,33 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
                       <X className="w-5 h-5" />
                     </button>
                   </div>
-                  {users.map((u) => {
-                    const active = u.id === currentUser.id;
-                    return (
-                      <button
-                        key={u.id}
-                        role="menuitem"
-                        onClick={() => {
-                          setCurrentUser(u);
-                          setShowRoleMenu(false);
-                        }}
-                        className={`w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-slate-50 ${
-                          active ? 'bg-brand-50' : ''
-                        }`}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={u.avatar} alt="" className="w-11 h-11 rounded-lg object-cover" />
-                        <div className="flex-1">
-                          <div className="text-base font-bold text-slate-900">{u.name}</div>
-                          <div className="text-sm text-slate-600">
-                            {t(ROLE_LABEL[u.role])} · {u.division}
-                          </div>
-                        </div>
-                        {active && <Check className="w-6 h-6 text-brand-600" />}
-                      </button>
-                    );
-                  })}
+                  {currentUser.role === 'Installer' && (
+                    <div className="text-sm text-slate-700 bg-slate-50 rounded-lg p-2.5 flex gap-2">
+                      <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-brand-600" />
+                      <span>
+                        <span className="font-semibold">{t('Your villages:')}</span>{' '}
+                        {villagesOf(currentUser, villages).length
+                          ? villagesOf(currentUser, villages).map(villageLabel).join(', ')
+                          : t('None yet. Call the office.')}
+                      </span>
+                    </div>
+                  )}
+                  {signOutBlocked && (
+                    <p role="alert" className="text-sm font-semibold text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                      {t('Some of your work is not sent yet. Connect to the internet and wait for it to be sent, then sign out.')}
+                    </p>
+                  )}
+                  <button
+                    role="menuitem"
+                    onClick={async () => {
+                      const ok = await signOut();
+                      setSignOutBlocked(!ok);
+                    }}
+                    className="w-full py-3 rounded-xl border-2 border-slate-300 hover:bg-slate-50 text-base font-bold text-slate-800 flex items-center justify-center gap-2"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    {t('Sign out')}
+                  </button>
                 </div>
               )}
             </div>

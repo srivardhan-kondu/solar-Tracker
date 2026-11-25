@@ -6,7 +6,7 @@ import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
 
 dotenv.config({ path: '.env.local' });
 const sql = neon(process.env.DATABASE_URL);
-const tables = ['users', 'consumers', 'inventory', 'installations', 'dcr_records', 'service_tickets', 'exceptions', 'audit_logs', 'surveys'];
+const tables = ['users', 'consumers', 'inventory', 'installations', 'dcr_records', 'service_tickets', 'exceptions', 'audit_logs', 'surveys', 'villages'];
 const existing = new Set((await sql`select table_name from information_schema.tables where table_schema = 'public'`).map((r) => r.table_name));
 for (const t of tables) {
   if (!existing.has(t)) { console.log(`${t.padEnd(16)} (not created yet - open the app once)`); continue; }
