@@ -24,10 +24,12 @@ type Fix = { latitude: number; longitude: number; accuracy: number; at: number }
 export const CameraCapture: React.FC<{
   /** Printed on the photo, e.g. "AP-GNT-2026-003 · Roof photo 1" */
   stampLabel: string;
+  /** The consumer's address, printed on the photo under the location */
+  stampAddress?: string;
   title: string;
   onCapture: (photo: CapturedPhoto) => void;
   onClose: () => void;
-}> = ({ stampLabel, title, onCapture, onClose }) => {
+}> = ({ stampLabel, stampAddress, title, onCapture, onClose }) => {
   const { t } = useLang();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [attempt, setAttempt] = useState(0);
@@ -153,7 +155,7 @@ export const CameraCapture: React.FC<{
     try {
       const clockChecked = clockOffset !== null;
       const takenAt = Date.now() + (clockOffset ?? 0);
-      const { url, capturedAt } = captureStampedFrame(v, freshFix, stampLabel, takenAt, clockChecked);
+      const { url, capturedAt } = captureStampedFrame(v, freshFix, stampLabel, takenAt, clockChecked, stampAddress);
       setShot({
         url,
         capturedAt,
@@ -184,6 +186,7 @@ export const CameraCapture: React.FC<{
         <div className="min-w-0">
           <div className="text-base font-bold truncate">{title}</div>
           <div className="text-sm text-slate-300 truncate">{stampLabel}</div>
+          {stampAddress && <div className="text-xs text-slate-400 truncate">{stampAddress}</div>}
         </div>
         <button onClick={onClose} aria-label={t('Close camera')} className="w-12 h-12 flex-shrink-0 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center">
           <X className="w-6 h-6" />

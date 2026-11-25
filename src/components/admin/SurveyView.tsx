@@ -29,7 +29,7 @@ import {
 } from '@/lib/survey';
 import { CameraCapture } from '@/components/camera/CameraCapture';
 import { PhotoVerification } from '@/components/camera/PhotoVerification';
-import { formatGeo, hasGeo, mapsLink } from '@/lib/geoPhoto';
+import { consumerAddress, formatGeo, hasGeo, mapsLink } from '@/lib/geoPhoto';
 import { ConsentSection } from './ConsentForm';
 import { DecisionBadge, LabelledPhoto, ReopenedNotice, ReopenSurveyControl, SurveySummary } from './SurveySummary';
 
@@ -43,10 +43,11 @@ const now = () => new Date().toLocaleString('en-IN', { dateStyle: 'medium', time
 /* ---------- Photo taking ---------- */
 
 /** One big button that opens the in-app camera. Photos cannot be uploaded from the phone. */
-const PhotoPicker: React.FC<{ onPicked: (photo: SurveyPhoto) => void; title: string; stampLabel: string }> = ({
+const PhotoPicker: React.FC<{ onPicked: (photo: SurveyPhoto) => void; title: string; stampLabel: string; stampAddress?: string }> = ({
   onPicked,
   title,
   stampLabel,
+  stampAddress,
 }) => {
   const { t } = useLang();
   const [open, setOpen] = useState(false);
@@ -60,6 +61,7 @@ const PhotoPicker: React.FC<{ onPicked: (photo: SurveyPhoto) => void; title: str
         <CameraCapture
           title={title}
           stampLabel={stampLabel}
+          stampAddress={stampAddress}
           onClose={() => setOpen(false)}
           onCapture={(shot) => {
             setOpen(false);
@@ -498,6 +500,7 @@ export const SurveyView: React.FC<{ onGoToInstallation: () => void }> = ({ onGoT
             <PhotoPicker
               title={t(label, { n: list.length + 1 })}
               stampLabel={`${openNum} · ${noTranslate(label, { n: list.length + 1 })}`}
+              stampAddress={consumerAddress(consumer)}
               onPicked={(photo) => update((d) => ({ ...d, [key]: [...d[key], photo].slice(0, MAX_EXTRA_PHOTOS) }))}
             />
           </div>
@@ -524,6 +527,7 @@ export const SurveyView: React.FC<{ onGoToInstallation: () => void }> = ({ onGoT
         <PhotoPicker
           title={t(label)}
           stampLabel={`${openNum} · ${label}`}
+          stampAddress={consumerAddress(consumer)}
           onPicked={(photo) => update((d) => ({ ...d, [key]: photo }))}
         />
       </div>

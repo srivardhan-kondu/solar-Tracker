@@ -13,6 +13,15 @@ export const hasGeo = (p?: { url: string; geo?: GeoTag }) =>
 export const formatGeo = (g: GeoTag) =>
   `${g.latitude.toFixed(6)}, ${g.longitude.toFixed(6)} (±${Math.round(g.accuracy)} m)`;
 
+/** All consumers in this app are in this state (consumer numbers start with "AP-") */
+const STATE_NAME = 'Andhra Pradesh';
+
+/** The consumer's address from the consumer list, for printing on photos */
+export const consumerAddress = (c?: { village?: string; mandal?: string; district?: string }) =>
+  c
+    ? [c.village, c.mandal && `${c.mandal} Mandal`, c.district && `${c.district} District`, STATE_NAME].filter(Boolean).join(', ')
+    : undefined;
+
 /** Distance in metres between two points on the earth */
 export const distanceMetres = (a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) => {
   const rad = (d: number) => (d * Math.PI) / 180;
@@ -40,10 +49,11 @@ const stampTime = (d: Date) =>
  * One text size is chosen so the longest line fills the full width; every line is then
  * spread from the left edge to the right edge. The band is kept to at most 40% of the photo.
  */
-const drawStamp = (ctx: CanvasRenderingContext2D, w: number, h: number, lines: string[][]) => {
+const drawStamp = (ctx: CanvasRenderingContext2D, w: number, h: number, lines: string[][], address?: string) => {
   const FONT = (size: number, bold: boolean) => `${bold ? 'bold ' : ''}${size}px Arial, Helvetica, sans-serif`;
   const LINE_HEIGHT = 1.22;
   const MAX_BAND_SHARE = 0.4;
+  const MAX_ADDRESS_LINES = 2;
   const pad = Math.max(8, Math.round(w * 0.025));
   const usable = w - pad * 2;
 
@@ -52,14 +62,39 @@ const drawStamp = (ctx: CanvasRenderingContext2D, w: number, h: number, lines: s
     ctx.font = FONT(100, bold);
     return parts.reduce((sum, part) => sum + ctx.measureText(part).width, 0) + (parts.length - 1) * 100;
   };
+
+  // Break the address into lines that fit the width at this text size (at most 2; the last one is squeezed if needed)
+  const wrapAddress = (size: number): string[] => {
+    if (!address) return [];
+    ctx.font = FONT(size, false);
+    const out: string[] = [];
+    let current = '';
+    for (const word of address.split(' ')) {
+      const next = current ? `${current} ${word}` : word;
+      if (ctx.measureText(next).width <= usable || !current) current = next;
+      else {
+        out.push(current);
+        current = word;
+      }
+    }
+    if (current) out.push(current);
+    return out.length > MAX_ADDRESS_LINES ? [...out.slice(0, MAX_ADDRESS_LINES - 1), out.slice(MAX_ADDRESS_LINES - 1).join(' ')] : out;
+  };
+
   const widest = Math.max(...lines.map((parts, i) => naturalWidth(parts, i === 0)));
   let font = Math.floor((usable / widest) * 100);
-  // Not taller than the allowed band
-  const maxByHeight = Math.floor((h * MAX_BAND_SHARE - pad * 2) / (lines.length * LINE_HEIGHT));
-  font = Math.max(12, Math.min(font, maxByHeight));
+  // Not taller than the allowed band (address lines included)
+  let addressLines = wrapAddress(font);
+  for (let tries = 0; tries < 3; tries++) {
+    const rows = lines.length + addressLines.length;
+    const maxByHeight = Math.floor((h * MAX_BAND_SHARE - pad * 2) / (rows * LINE_HEIGHT));
+    if (font <= maxByHeight) break;
+    font = Math.max(12, maxByHeight);
+    addressLines = wrapAddress(font);
+  }
 
   const lineH = Math.round(font * LINE_HEIGHT);
-  const band = lines.length * lineH + pad * 2;
+  const band = (lines.length + addressLines.length) * lineH + pad * 2;
   const top = h - band;
   ctx.fillStyle = 'rgba(0,0,0,0.65)';
   ctx.fillRect(0, top, w, band);
@@ -83,6 +118,12 @@ const drawStamp = (ctx: CanvasRenderingContext2D, w: number, h: number, lines: s
       x += widths[j] + gap;
     });
   });
+
+  ctx.font = FONT(font, false);
+  addressLines.forEach((text, i) => {
+    const y = top + pad + (lines.length + i) * lineH + lineH / 2;
+    ctx.fillText(text, pad, y, usable);
+  });
 };
 
 /**
@@ -95,6 +136,8 @@ export const captureStampedFrame = (
   label: string,
   takenAt: number,
   clockChecked: boolean,
+  /** The consumer's address from the consumer list, printed under the location */
+  address?: string,
   maxSide = 1280,
   quality = 0.72
 ): { url: string; capturedAt: string } => {
@@ -116,7 +159,7 @@ export const captureStampedFrame = (
     [`±${Math.round(geo.accuracy)} m`, `${stampTime(now)} IST`, ...(clockChecked ? [] : ['(phone clock, offline)'])],
     rest.length ? [consumer, rest.join(' · ')] : [consumer],
   ];
-  drawStamp(ctx, w, h, lines);
+  drawStamp(ctx, w, h, lines, address);
 
   return {
     url: canvas.toDataURL('image/jpeg', quality),

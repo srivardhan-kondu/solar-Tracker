@@ -26,7 +26,7 @@ import {
   REQUIRED_PHOTOS,
 } from '@/lib/installationSteps';
 import { CameraCapture, CapturedPhoto } from '@/components/camera/CameraCapture';
-import { distanceMetres, formatGeo, hasGeo, mapsLink } from '@/lib/geoPhoto';
+import { consumerAddress, distanceMetres, formatGeo, hasGeo, mapsLink } from '@/lib/geoPhoto';
 import { canInstall, needsSurvey } from '@/lib/survey';
 
 const PHOTO_GUIDES: Record<PhotoCategory, { title: string; hint: string; sampleUrl: string }> = {
@@ -792,6 +792,7 @@ export const FieldSubmissionWebView: React.FC<{
                   <CameraCapture
                     title={t(PHOTO_GUIDES[cameraFor].title)}
                     stampLabel={`${installerDraft.consumerNumber} · ${PHOTO_GUIDES[cameraFor].title}`}
+                    stampAddress={consumerAddress(currentConsumer)}
                     onClose={() => setCameraFor(null)}
                     onCapture={(shot) => handlePhotoTaken(cameraFor, shot)}
                   />
