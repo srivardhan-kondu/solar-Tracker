@@ -8,6 +8,7 @@ import {
   ActionRequiredException,
   AuditEvent,
   SiteSurvey,
+  Village,
 } from '@/types';
 
 export const SEED_USERS: User[] = [
@@ -45,6 +46,7 @@ export const SEED_USERS: User[] = [
     district: 'Guntur',
     status: 'Active',
     lastLogin: '2026-11-24 11:45 AM',
+    villageIds: ['vil_pedakakani', 'vil_narakodur', 'vil_kaza', 'vil_chinna_kakani'],
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face',
   },
   {
@@ -57,6 +59,7 @@ export const SEED_USERS: User[] = [
     district: 'Guntur',
     status: 'Active',
     lastLogin: '2026-11-23 04:20 PM',
+    villageIds: ['vil_atchampet', 'vil_kollipara', 'vil_duggirala'],
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face',
   },
   {
@@ -202,6 +205,34 @@ export const SEED_CONSUMERS: Consumer[] = [
     assignedDate: undefined,
     capacityKw: 3.3,
   },
+];
+
+/**
+ * Sample villages for testing: the villages of the sample consumers.
+ * Centre points are approximate. Check and correct them before relying on them in the field.
+ * Chebrolu is not given to any installer, to try giving it to someone.
+ */
+const village = (id: string, name: string, mandal: string, district: string, latitude: number, longitude: number): Village => ({
+  id,
+  name,
+  mandal,
+  district,
+  latitude,
+  longitude,
+  radiusM: 2000,
+  updatedBy: 'Sample data',
+  updatedAt: '25 Nov 2026, 4:00 pm',
+});
+
+export const SEED_VILLAGES: Village[] = [
+  village('vil_pedakakani', 'Pedakakani', 'Guntur Rural', 'Guntur', 16.353, 80.483),
+  village('vil_narakodur', 'Narakodur', 'Chebrolu', 'Guntur', 16.221, 80.507),
+  village('vil_kaza', 'Kaza', 'Mangalagiri', 'Guntur', 16.388, 80.534),
+  village('vil_chinna_kakani', 'Chinna Kakani', 'Mangalagiri', 'Guntur', 16.41, 80.56),
+  village('vil_atchampet', 'Atchampet', 'Atchampet', 'Palnadu', 16.63, 80.12),
+  village('vil_kollipara', 'Kollipara', 'Tenali', 'Guntur', 16.287, 80.75),
+  village('vil_duggirala', 'Duggirala', 'Tenali', 'Guntur', 16.329, 80.625),
+  village('vil_chebrolu', 'Chebrolu', 'Chebrolu', 'Guntur', 16.196, 80.526),
 ];
 
 export const SEED_INVENTORY: EquipmentInventory[] = [

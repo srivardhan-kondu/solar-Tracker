@@ -10,6 +10,7 @@ import {
   SEED_SERVICE_TICKETS,
   SEED_SURVEYS,
   SEED_USERS,
+  SEED_VILLAGES,
 } from '@/data/seedData';
 import { AllData, chronological, DbRecord, TABLE_NAMES, TableChanges, TableName, TABLES } from '@/lib/tables';
 
@@ -186,7 +187,7 @@ const SEED: Record<TableName, DbRecord[]> = {
   exceptions: SEED_EXCEPTIONS as unknown as DbRecord[],
   audit_logs: SEED_AUDIT_LOGS as unknown as DbRecord[],
   surveys: SEED_SURVEYS as unknown as DbRecord[],
-  villages: [],
+  villages: SEED_VILLAGES as unknown as DbRecord[],
 };
 
 const seedQueries = () => TABLE_NAMES.map((t) => upsertQuery(t, chronological(t, SEED[t])));
