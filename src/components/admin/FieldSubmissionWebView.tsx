@@ -87,7 +87,8 @@ const btnBack = 'px-5 py-3 border border-slate-300 rounded-xl text-sm font-semib
 
 export const FieldSubmissionWebView: React.FC<{
   onFinished: () => void;
-}> = ({ onFinished }) => {
+  onGoToSurvey?: () => void;
+}> = ({ onFinished, onGoToSurvey }) => {
   const { t } = useLang();
   const {
     consumers,
@@ -114,8 +115,10 @@ export const FieldSubmissionWebView: React.FC<{
       (currentUser.role !== 'Installer' || c.assignedInstallerId === currentUser.id)
   );
   // Only homes the site survey marked Feasible can be installed
-  const openJobs = myJobs.filter((c) => canInstall(surveys, installations, c.consumerNumber));
+  const openJobs = myJobs.filter((c) => canInstall(surveys, c.consumerNumber));
   const waitingForSurvey = myJobs.filter((c) => needsSurvey(c, surveys, installations)).length;
+  // A job kept on the phone from before its home was surveyed must wait for the survey
+  const draftNeedsSurvey = !!installerDraft && !canInstall(surveys, installerDraft.consumerNumber);
 
   const [selectedConsumerNum, setSelectedConsumerNum] = useState<string>('');
   const [panelInput, setPanelInput] = useState<string[]>(['', '', '', '']);
@@ -286,6 +289,10 @@ export const FieldSubmissionWebView: React.FC<{
     if (!installerDraft) return;
     const snapshot = { ...installerDraft };
     const result = submitInstallationDraft();
+    if (!result.success) {
+      setValidationAlert({ text: result.message, success: false });
+      return;
+    }
     setSubmitted({ result, draft: snapshot });
   };
 
@@ -419,6 +426,22 @@ export const FieldSubmissionWebView: React.FC<{
                 ? t('1 more home needs a site survey first. Open Site Survey in the menu.')
                 : t('{n} more homes need a site survey first. Open Site Survey in the menu.', { n: waitingForSurvey })}
             </p>
+          )}
+        </div>
+      ) : draftNeedsSurvey ? (
+        <div className="bg-white rounded-2xl border-2 border-amber-300 shadow-sm p-8 text-center space-y-4" role="alert">
+          <AlertTriangle className="w-10 h-10 text-amber-600 mx-auto" />
+          <div className="text-lg font-bold text-slate-900">{t('Do the site survey first')}</div>
+          <p className="text-base text-slate-600">
+            {t('{num} has not been surveyed as Feasible yet. Survey the home first; your installation work is kept and you can carry on after.', {
+              num: installerDraft.consumerNumber,
+            })}
+          </p>
+          {onGoToSurvey && (
+            <button onClick={onGoToSurvey} className={btnPrimary + ' mx-auto justify-center'}>
+              {t('Go to Site Survey')}
+              <ArrowRight className="w-4 h-4" />
+            </button>
           )}
         </div>
       ) : (

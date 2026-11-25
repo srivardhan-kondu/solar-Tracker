@@ -100,7 +100,17 @@ const checkInstaller = async (user: User, changes: TableChanges[]) => {
   const refused: Refusal[] = [];
   const NOT_YOURS = 'This home is not assigned to you';
 
-  for (const c of changes) {
+  // Survey comes first: homes whose survey was sent as Feasible (here, or earlier in this same send)
+  const feasibleRows = (await sql.query(
+    `select consumer_number from surveys where status = 'Submitted' and decision = 'Feasible' and consumer_number = any($1::text[])`,
+    [Array.from(mine)]
+  )) as { consumer_number: string }[];
+  const feasible = new Set(feasibleRows.map((r) => r.consumer_number));
+  const isFeasibleSurvey = (r: DbRecord) => r.status === 'Submitted' && r.decision === 'Feasible';
+  // Check surveys before installations, so a survey and its installation can arrive together
+  const ordered = [...changes].sort((a, b) => Number(b.table === 'surveys') - Number(a.table === 'surveys'));
+
+  for (const c of ordered) {
     const ok: DbRecord[] = [];
     const before = await existing(c.table, c.upserts.map((r) => r.id));
     for (const id of c.deletes) refused.push({ table: c.table, id, reason: 'Field staff cannot delete records' });
@@ -121,9 +131,15 @@ const checkInstaller = async (user: User, changes: TableChanges[]) => {
           const n = consumerNumberOf(r);
           if (!n || !mine.has(n)) { refuse(NOT_YOURS); continue; }
           if (old && consumerNumberOf(old) !== n) { refuse('Record belongs to another home'); continue; }
+          // A new installation needs a Feasible survey; ones already accepted may still be updated
+          if (c.table === 'installations' && !old && !feasible.has(n)) {
+            refuse('Do the site survey first. Only homes marked Feasible can be installed');
+            continue;
+          }
           const fixes = photosOf(c.table, r).flatMap((p) => (p.geo ? [p.geo] : []));
           const problem = outsideVillagesProblem(user, villages, fixes);
           if (problem) { refuse(problem); continue; }
+          if (c.table === 'surveys' && isFeasibleSurvey(r)) feasible.add(n);
           break;
         }
         case 'inventory': {

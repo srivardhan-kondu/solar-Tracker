@@ -24,23 +24,24 @@ export const surveyFor = (surveys: SiteSurvey[], consumerNumber: string) =>
   surveys.find((s) => s.consumerNumber === consumerNumber);
 
 /**
- * A home can be installed only after a survey said "Feasible".
- * Homes whose installation was already started (before surveys existed) are allowed to carry on.
+ * Survey always comes first: a home can be installed only after its survey was sent as "Feasible".
+ * No exceptions, so every home the office assigns starts on the installer's Survey screen.
  */
-export const canInstall = (surveys: SiteSurvey[], installations: Installation[], consumerNumber: string) => {
+export const canInstall = (surveys: SiteSurvey[], consumerNumber: string) => {
   const s = surveyFor(surveys, consumerNumber);
-  if (s?.status === 'Submitted') return s.decision === 'Feasible';
-  return installations.some((i) => i.consumerNumber === consumerNumber);
+  return s?.status === 'Submitted' && s.decision === 'Feasible';
 };
 
 // Jobs already sent or finished
 const CLOSED_STATUSES = ['Completed', 'Received by Server', 'Saved Locally', 'Waiting to Sync'];
+// An installation already handed to the office (it is the office's to check now, not the installer's to survey)
+const SENT_INSTALLATION = [...CLOSED_STATUSES, 'Needs Review'];
 
-/** Still waiting for a site survey: not surveyed yet, and installation not already under way. */
+/** Still waiting for a site survey: not surveyed yet, and no installation already sent for it. */
 export const needsSurvey = (c: Consumer, surveys: SiteSurvey[], installations: Installation[]) =>
   !CLOSED_STATUSES.includes(c.status) &&
   surveyFor(surveys, c.consumerNumber)?.status !== 'Submitted' &&
-  !installations.some((i) => i.consumerNumber === c.consumerNumber);
+  !installations.some((i) => i.consumerNumber === c.consumerNumber && SENT_INSTALLATION.includes(i.status));
 
 /**
  * Office staff can reopen a sent survey only while installation has not started.

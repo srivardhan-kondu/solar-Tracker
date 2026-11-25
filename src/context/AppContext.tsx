@@ -247,7 +247,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Installers work only on their own homes
     if (currentUser.role === 'Installer' && consumer.assignedInstallerId !== currentUser.id) return;
     // A home is installed only after the site survey says it is feasible
-    if (!canInstall(surveys, installations, consumerNumber)) return;
+    if (!canInstall(surveys, consumerNumber)) return;
 
     // Check existing installation
     const existing = installations.find((i) => i.consumerNumber === consumerNumber);
@@ -449,6 +449,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Submit Installation Draft
   const submitInstallationDraft = (): { success: boolean; isOffline: boolean; message: string } => {
     if (!installerDraft) return { success: false, isOffline: !isOnline, message: t('No draft found.') };
+    // Survey comes first, also for a job saved on the phone before the survey was needed
+    if (!canInstall(surveys, installerDraft.consumerNumber)) {
+      return {
+        success: false,
+        isOffline: !isOnline,
+        message: t('Finish the site survey for this home first. Only homes marked Feasible can be installed.'),
+      };
+    }
 
     const missingPhotos: string[] = [];
     const requiredCats: PhotoCategory[] = ['front', 'side', 'consumer', 'meter', 'inverter', 'structure', 'earthing'];

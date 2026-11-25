@@ -96,7 +96,7 @@ export default function Home() {
 
           {show('survey') && <SurveyView onGoToInstallation={() => navigate('field_portal')} />}
 
-          {show('field_portal') && <FieldSubmissionWebView onFinished={() => navigate('installations')} />}
+          {show('field_portal') && <FieldSubmissionWebView onFinished={() => navigate('installations')} onGoToSurvey={() => navigate('survey')} />}
 
           {show('installations') && (
             <ConsumerSearchView
