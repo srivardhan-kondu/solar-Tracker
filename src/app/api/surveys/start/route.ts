@@ -5,9 +5,9 @@ import { NewHomeDetails, takeHomeForSurvey } from '@/lib/server/scope';
 export const dynamic = 'force-dynamic';
 
 /**
- * An installer starts a survey on their own, on a home the office has not given them.
- * Body: { consumerNumber, details?: { name, mobile, villageId } } (details only for a home not in the list).
- * Returns { consumer, added, alreadyYours }, { notFound: true } or { problem, field? }.
+ * "New survey": an installer types a home's details and surveys it, without the office assigning it.
+ * Body: { consumerNumber, details: { name, mobile, villageId, capacityKw, ula } }.
+ * Returns { consumer, added, alreadyYours } or { problem, field? }.
  */
 export async function POST(req: Request) {
   let body: { consumerNumber?: unknown; details?: Partial<Record<keyof NewHomeDetails, unknown>> };
@@ -18,9 +18,13 @@ export async function POST(req: Request) {
   }
   if (typeof body?.consumerNumber !== 'string') return NextResponse.json({ error: 'Bad request' }, { status: 400 });
   const d = body.details;
-  const details: NewHomeDetails | undefined = d
-    ? { name: String(d.name ?? ''), mobile: String(d.mobile ?? ''), villageId: String(d.villageId ?? '') }
-    : undefined;
+  const details: NewHomeDetails = {
+    name: String(d?.name ?? ''),
+    mobile: String(d?.mobile ?? ''),
+    villageId: String(d?.villageId ?? ''),
+    capacityKw: Number(d?.capacityKw),
+    ula: String(d?.ula ?? ''),
+  };
   try {
     const user = await sessionUser();
     if (!user) return notSignedIn();

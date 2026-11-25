@@ -251,12 +251,14 @@ export interface NewHomeDetails {
   name: string;
   mobile: string;
   villageId: string;
+  /** Solar size applied for, in kW */
+  capacityKw: number;
+  /** Application (ULA) number, if the applicant has it */
+  ula: string;
 }
 
 export type TakeHomeResult =
   | { consumer: Consumer; added: boolean; alreadyYours: boolean }
-  /** Not in the office's list: ask the installer for the home's details */
-  | { notFound: true }
   | { problem: string; field?: keyof NewHomeDetails | 'consumerNumber' };
 
 const TAKEN = 'This home is already given to another installer. Ask the office if it should be yours.';
@@ -289,45 +291,58 @@ const auditFor = (user: User, consumerNumber: string, details: string): DbRecord
 });
 
 /**
- * An installer starts a survey on a home the office has not given them.
- * - Home in the office's list and given to nobody: it becomes theirs.
+ * "New survey": an installer types a home's details and surveys it, without waiting for the office.
+ * - Home not in the list: it is added with these details and given to them.
+ * - Home in the list and given to nobody: it becomes theirs (the office's details are kept; blanks are filled in).
+ * - Home already theirs: carry on.
  * - Home given to another installer: refused.
- * - Home not in the list: with `details` it is added and given to them; without, `notFound`.
  */
-export const takeHomeForSurvey = async (user: User, rawNumber: string, details?: NewHomeDetails): Promise<TakeHomeResult> => {
+export const takeHomeForSurvey = async (user: User, rawNumber: string, details: NewHomeDetails): Promise<TakeHomeResult> => {
   await ensureDb();
   const consumerNumber = cleanConsumerNumber(rawNumber);
   if (consumerNumber.length < 3 || consumerNumber.length > 40)
     return { problem: 'Please type the consumer number from the electricity bill.', field: 'consumerNumber' };
+  const name = details.name.trim().replace(/\s+/g, ' ');
+  if (name.length < 2 || name.length > 100) return { problem: 'Please type the name on the electricity bill.', field: 'name' };
+  const mobile = normalizeMobile(details.mobile);
+  if (!mobile) return { problem: 'Please enter a valid 10-digit mobile number (starting with 6, 7, 8 or 9).', field: 'mobile' };
+  const capacityKw = Math.round(details.capacityKw * 100) / 100;
+  if (!Number.isFinite(capacityKw) || capacityKw < 0.5 || capacityKw > 20)
+    return { problem: 'Please type the solar size in kW (for example 3).', field: 'capacityKw' };
+  const ula = details.ula.trim().slice(0, 60);
 
-  const villages = await allVillages();
-  const mine = villagesOf(user, villages);
+  // Survey photos must be taken inside the installer's approved villages
+  const mine = villagesOf(user, await allVillages());
   if (!mine.length) return { problem: 'The office has not given you any villages yet. Ask them to add your villages first.' };
+  const village = mine.find((v) => v.id === details.villageId);
+  if (!village) return { problem: 'Please choose one of your villages.', field: 'villageId' };
 
   const home = await findHome(consumerNumber);
   if (home) {
     if (home.assignedInstallerId === user.id) return { consumer: home, added: false, alreadyYours: true };
     if (home.assignedInstallerId) return { problem: TAKEN };
     if (CLOSED_STATUSES.includes(home.status)) return { problem: 'This home has already been installed. Ask the office if it needs another visit.' };
-    const patch = { assignedInstallerId: user.id, assignedInstallerName: user.name, assignedDate: istToday(), selfAssigned: true };
+    const patch = {
+      assignedInstallerId: user.id,
+      assignedInstallerName: user.name,
+      assignedDate: istToday(),
+      selfAssigned: true,
+      // The office's details stay; the installer's fill only what the list left empty
+      ...(home.name?.trim() ? {} : { name }),
+      ...(home.mobile?.trim() ? {} : { mobile }),
+      ...(home.village?.trim() ? {} : { village: village.name, mandal: village.mandal ?? '', district: village.district ?? user.district ?? '' }),
+      ...(home.capacityKw > 0 ? {} : { capacityKw }),
+      ...(home.ula?.trim() || !ula ? {} : { ula }),
+    };
     const saved = await takeHome(
       { claim: { id: home.id, patch, installerId: user.id } },
-      auditFor(user, home.consumerNumber, `${user.name} started a site survey on their own and took ${home.consumerNumber} (${home.name}, ${home.village}).`)
+      auditFor(user, home.consumerNumber, `${user.name} started a new survey on their own and took ${home.consumerNumber} (${home.name || name}, ${home.village || village.name}).`)
     );
     if (saved) return { consumer: saved as unknown as Consumer, added: false, alreadyYours: false };
     // Someone else took it a moment ago
     const now = await findHome(consumerNumber);
     return now?.assignedInstallerId === user.id ? { consumer: now, added: false, alreadyYours: true } : { problem: TAKEN };
   }
-
-  if (!details) return { notFound: true };
-
-  const name = details.name.trim().replace(/\s+/g, ' ');
-  if (name.length < 2 || name.length > 100) return { problem: 'Please type the name on the electricity bill.', field: 'name' };
-  const mobile = normalizeMobile(details.mobile);
-  if (!mobile) return { problem: 'Please enter a valid 10-digit mobile number (starting with 6, 7, 8 or 9).', field: 'mobile' };
-  const village = mine.find((v) => v.id === details.villageId);
-  if (!village) return { problem: 'Please choose one of your villages.', field: 'villageId' };
 
   const consumer: Consumer = {
     // Built from the number, so two people adding the same new home at once cannot make two records
@@ -339,18 +354,18 @@ export const takeHomeForSurvey = async (user: User, rawNumber: string, details?:
     mandal: village.mandal ?? '',
     district: village.district ?? user.district ?? '',
     division: user.division ?? '',
-    ula: '',
+    ula,
     status: 'Assigned',
     assignedInstallerId: user.id,
     assignedInstallerName: user.name,
     assignedDate: istToday(),
-    capacityKw: 3.3,
+    capacityKw,
     selfAssigned: true,
     addedByInstaller: true,
   };
   const saved = await takeHome(
     { add: consumer as unknown as DbRecord },
-    auditFor(user, consumerNumber, `${user.name} added a new home that was not in the consumer list: ${consumerNumber} (${name}, ${villageLabel(village)}, ${mobile}), and started its site survey.`)
+    auditFor(user, consumerNumber, `${user.name} started a new survey and added a home that was not in the consumer list: ${consumerNumber} (${name}, ${villageLabel(village)}, ${mobile}, ${capacityKw} kW${ula ? `, ULA ${ula}` : ''}).`)
   );
   if (saved) return { consumer: saved as unknown as Consumer, added: true, alreadyYours: false };
   const now = await findHome(consumerNumber);

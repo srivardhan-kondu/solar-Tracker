@@ -187,166 +187,187 @@ const ChoiceGrid = <V extends string>({
   );
 };
 
-/* ---------- Installer starts a survey on their own ---------- */
+/* ---------- New survey: the installer starts one on their own ---------- */
 
 const fieldCls = 'w-full px-4 py-3 bg-white border-2 rounded-xl text-base';
 
 /**
- * Any home, without waiting for the office: type the consumer number.
- * In the office's list and free → it becomes yours. Not in the list → type its details and add it.
- * Homes given to another installer are refused.
+ * A big "New survey" button. It opens a short form for the home's details;
+ * then the survey starts at once. The office does not need to assign the home first.
  */
-const StartNewSurvey: React.FC<{ onStarted: (consumerNumber: string, message: string) => void }> = ({ onStarted }) => {
+const NewSurvey: React.FC<{ onStarted: (consumerNumber: string, message: string) => void }> = ({ onStarted }) => {
   const { t } = useLang();
   const { startOwnSurvey, villages, currentUser } = useApp();
   const myVillages = villagesOf(currentUser, villages);
+  const [formOpen, setFormOpen] = useState(false);
   const [number, setNumber] = useState('');
-  const [askDetails, setAskDetails] = useState(false);
   const [name, setName] = useState('');
   const [mobile, setMobile] = useState('');
-  const [villageId, setVillageId] = useState('');
+  const [villageId, setVillageId] = useState(myVillages.length === 1 ? myVillages[0].id : '');
+  const [capacity, setCapacity] = useState('');
+  const [ula, setUla] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ message: string; field?: string } | null>(null);
+  const village = myVillages.find((v) => v.id === villageId);
 
-  const reset = () => {
-    setAskDetails(false);
+  const close = () => {
+    setFormOpen(false);
+    setNumber('');
     setName('');
     setMobile('');
-    setVillageId('');
+    setVillageId(myVillages.length === 1 ? myVillages[0].id : '');
+    setCapacity('');
+    setUla('');
     setError(null);
   };
 
-  const go = async (withDetails: boolean) => {
+  const submit = async () => {
     if (busy) return;
-    if (!number.trim()) {
-      setError({ message: t('Please type the consumer number from the electricity bill.'), field: 'consumerNumber' });
+    const missing = !number.trim()
+      ? 'consumerNumber'
+      : !name.trim()
+      ? 'name'
+      : !mobile.trim()
+      ? 'mobile'
+      : !villageId
+      ? 'villageId'
+      : !capacity.trim()
+      ? 'capacityKw'
+      : null;
+    if (missing) {
+      setError({ message: t('Please fill in all the details.'), field: missing });
       return;
     }
     setBusy(true);
     setError(null);
-    const res = await startOwnSurvey(number, withDetails ? { name, mobile, villageId } : undefined);
+    const res = await startOwnSurvey(number, { name, mobile, villageId, capacityKw: Number(capacity.replace(',', '.')), ula });
     setBusy(false);
-    if (res.ok) {
-      onStarted(
-        res.consumer.consumerNumber,
-        res.alreadyYours
-          ? t('This home is already on your list.')
-          : res.added
-          ? t('New home added. The office has been told. Start the survey below.')
-          : t('This home is now yours. Start the survey below.')
-      );
-      setNumber('');
-      reset();
+    if (!res.ok) {
+      setError({ message: res.message, field: res.field });
       return;
     }
-    if ('notFound' in res) {
-      setAskDetails(true);
-      return;
-    }
-    setError({ message: res.message, field: res.field });
+    close();
+    onStarted(res.consumer.consumerNumber, res.alreadyYours ? t('This home is already on your list. Carry on with its survey.') : t('Survey started. Fill in the parts below.'));
   };
+
+  if (!formOpen) {
+    return (
+      <button onClick={() => setFormOpen(true)} className={btnPrimary + ' w-full sm:w-auto text-lg py-4'}>
+        <Plus className="w-6 h-6" />
+        {t('New survey')}
+      </button>
+    );
+  }
+
+  if (!myVillages.length) {
+    return (
+      <div className="bg-white rounded-2xl border-2 border-amber-300 p-5 space-y-3" role="alert">
+        <div className="text-base font-bold text-slate-900 flex items-center gap-2">
+          <AlertTriangle className="w-5 h-5 text-amber-600" />
+          {t('No villages yet')}
+        </div>
+        <p className="text-base text-slate-600">{t('The office has not given you any villages yet. Ask them to add your villages first.')}</p>
+        <button onClick={close} className={btnBack}>
+          {t('Close')}
+        </button>
+      </div>
+    );
+  }
 
   const border = (f: string) => (error?.field === f ? 'border-red-400' : 'border-slate-300');
 
   return (
-    <div className="bg-white rounded-2xl border-2 border-brand-200 p-4 sm:p-5 space-y-4">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void submit();
+      }}
+      className="bg-white rounded-2xl border-2 border-brand-200 p-4 sm:p-5 space-y-4"
+    >
       <div>
         <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
           <Plus className="w-5 h-5 text-brand-600" />
-          {t('Start a new survey')}
+          {t('New survey')}
         </h2>
-        <p className="text-sm text-slate-600 mt-0.5">
-          {t('Survey any home, even if the office has not given it to you. Type the consumer number from the electricity bill.')}
-        </p>
+        <p className="text-sm text-slate-600 mt-0.5">{t("Fill in the home's details from the electricity bill, then start the survey.")}</p>
       </div>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void go(askDetails);
-        }}
-        className="space-y-4"
-      >
-        <label className="block space-y-1.5 max-w-md">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <label className="block space-y-1.5">
           <span className="text-base font-bold text-slate-800">{t('Consumer number')}</span>
           <input
             value={number}
-            onChange={(e) => {
-              setNumber(e.target.value);
-              if (askDetails) reset();
-              else setError(null);
-            }}
+            onChange={(e) => setNumber(e.target.value)}
             autoCapitalize="characters"
             autoComplete="off"
             placeholder={t('e.g. AP-GNT-2026-001')}
             className={`${fieldCls} font-mono ${border('consumerNumber')}`}
           />
         </label>
-
-        {askDetails && (
-          <div className="space-y-4 border-t border-slate-200 pt-4">
-            <div className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-start gap-2" role="status">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              {t('This home is not in the office list. Check the number on the bill. If it is right, add the home below.')}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <label className="block space-y-1.5">
-                <span className="text-base font-bold text-slate-800">{t('Name on the bill')}</span>
-                <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" className={`${fieldCls} ${border('name')}`} />
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-base font-bold text-slate-800">{t('Mobile number')}</span>
-                <input
-                  value={mobile}
-                  onChange={(e) => setMobile(e.target.value)}
-                  inputMode="tel"
-                  autoComplete="off"
-                  placeholder="98765 43210"
-                  className={`${fieldCls} ${border('mobile')}`}
-                />
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-base font-bold text-slate-800">{t('Village')}</span>
-                <select value={villageId} onChange={(e) => setVillageId(e.target.value)} className={`${fieldCls} ${border('villageId')}`}>
-                  <option value="">{t('Choose village')}</option>
-                  {myVillages.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {villageLabel(v)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-base font-semibold text-red-900 flex items-start gap-2" role="alert">
-            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            {error.message}
-          </div>
-        )}
-
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button type="submit" disabled={busy} className={btnPrimary}>
-            {busy ? t('Please wait…') : askDetails ? t('Add home and start survey') : t('Find home')}
-            {!busy && <ArrowRight className="w-5 h-5" />}
-          </button>
-          {askDetails && (
-            <button
-              type="button"
-              onClick={() => {
-                setNumber('');
-                reset();
-              }}
-              className={btnBack}
-            >
-              {t('Cancel')}
-            </button>
+        <label className="block space-y-1.5">
+          <span className="text-base font-bold text-slate-800">{t('Name on the bill')}</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" className={`${fieldCls} ${border('name')}`} />
+        </label>
+        <label className="block space-y-1.5">
+          <span className="text-base font-bold text-slate-800">{t('Mobile number')}</span>
+          <input
+            value={mobile}
+            onChange={(e) => setMobile(e.target.value)}
+            inputMode="tel"
+            autoComplete="off"
+            placeholder="98765 43210"
+            className={`${fieldCls} ${border('mobile')}`}
+          />
+        </label>
+        <label className="block space-y-1.5">
+          <span className="text-base font-bold text-slate-800">{t('Village')}</span>
+          <select value={villageId} onChange={(e) => setVillageId(e.target.value)} className={`${fieldCls} ${border('villageId')}`}>
+            <option value="">{t('Choose village')}</option>
+            {myVillages.map((v) => (
+              <option key={v.id} value={v.id}>
+                {villageLabel(v)}
+              </option>
+            ))}
+          </select>
+          {village && (village.mandal || village.district) && (
+            <span className="block text-sm text-slate-500">{[village.mandal, village.district].filter(Boolean).join(', ')}</span>
           )}
+        </label>
+        <label className="block space-y-1.5">
+          <span className="text-base font-bold text-slate-800">{t('Solar size (kW)')}</span>
+          <input
+            value={capacity}
+            onChange={(e) => setCapacity(e.target.value)}
+            inputMode="decimal"
+            autoComplete="off"
+            placeholder={t('e.g. 3')}
+            className={`${fieldCls} ${border('capacityKw')}`}
+          />
+        </label>
+        <label className="block space-y-1.5">
+          <span className="text-base font-bold text-slate-800">{t('Application (ULA) number')}</span>
+          <input value={ula} onChange={(e) => setUla(e.target.value)} autoComplete="off" className={`${fieldCls} font-mono border-slate-300`} />
+          <span className="block text-sm text-slate-500">{t('Leave empty if the applicant does not have it yet.')}</span>
+        </label>
+      </div>
+
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-base font-semibold text-red-900 flex items-start gap-2" role="alert">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          {error.message}
         </div>
-      </form>
-    </div>
+      )}
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <button type="submit" disabled={busy} className={btnPrimary}>
+          {busy ? t('Please wait…') : t('Start survey')}
+          {!busy && <ArrowRight className="w-5 h-5" />}
+        </button>
+        <button type="button" onClick={close} className={btnBack}>
+          {t('Cancel')}
+        </button>
+      </div>
+    </form>
   );
 };
 
@@ -450,7 +471,7 @@ export const SurveyView: React.FC<{ onGoToInstallation: () => void }> = ({ onGoT
         {storageWarning}
 
         {currentUser.role === 'Installer' && (
-          <StartNewSurvey
+          <NewSurvey
             onStarted={(num, msg) => {
               open(num);
               setListMsg(msg);
@@ -470,7 +491,7 @@ export const SurveyView: React.FC<{ onGoToInstallation: () => void }> = ({ onGoT
           {toSurvey.length === 0 ? (
             <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-base text-slate-600">
               {currentUser.role === 'Installer'
-                ? t('No homes are waiting for a survey. Use "Start a new survey" above to survey any home.')
+                ? t('No homes are waiting for a survey. Tap "New survey" above to survey any home.')
                 : t('No homes are waiting for a survey. Ask the office if you expected one.')}
             </div>
           ) : (
