@@ -884,4 +884,7 @@ export const TE: Record<string, string> = {
   'The office has not given you any villages yet': 'ఆఫీసు మీకు ఇంకా ఏ గ్రామాన్నీ ఇవ్వలేదు',
   'GSTIN:': 'GSTIN:',
   'Contact:': 'సంప్రదించండి:',
+  'Too many wrong PINs. Try again in {n} minutes, or ask the office to set a new PIN.': 'చాలాసార్లు తప్పు పిన్ ఇచ్చారు. {n} నిమిషాల తర్వాత మళ్ళీ ప్రయత్నించండి, లేదా కొత్త పిన్ కోసం ఆఫీసును అడగండి.',
+  'Demo': 'డెమో',
+  'Practice copy with sample data. Nothing here is real.': 'నమూనా డేటాతో అభ్యాసం కోసం మాత్రమే. ఇక్కడ ఏదీ నిజం కాదు.',
 };

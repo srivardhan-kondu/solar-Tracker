@@ -43,3 +43,16 @@ export const Logo: React.FC<{ compact?: boolean }> = ({ compact }) => {
   </div>
 );
 };
+
+/** Shown on the demo only, so no one mistakes it for the real system */
+export const DemoBadge: React.FC = () => {
+  const { t } = useLang();
+  return (
+    <span
+      className="flex-shrink-0 px-2.5 py-1 rounded-lg bg-amber-400 text-amber-950 text-sm font-bold uppercase tracking-wide"
+      title={t('Practice copy with sample data. Nothing here is real.')}
+    >
+      {t('Demo')}
+    </span>
+  );
+};

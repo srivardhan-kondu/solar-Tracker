@@ -4,7 +4,8 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { AlertTriangle, Building2, Languages, Loader2, LogIn, Mail, Phone } from 'lucide-react';
 import { COMPANY } from '@/lib/company';
 import { useLang } from '@/i18n/LanguageContext';
-import { Logo } from '@/components/brand/Logo';
+import { DemoBadge, Logo } from '@/components/brand/Logo';
+import { IS_DEMO } from '@/lib/mode';
 import { User } from '@/types';
 import { discardUnsentWork, hasUnsentWork } from '@/lib/serverSync';
 
@@ -202,6 +203,12 @@ const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             {lang === 'en' ? 'తెలుగు' : 'English'}
           </button>
         </div>
+        {IS_DEMO && (
+          <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-300 text-sm text-amber-950">
+            <DemoBadge />
+            <span>{t('Practice copy with sample data. Nothing here is real.')}</span>
+          </div>
+        )}
         {children}
         <CompanyCard />
       </div>
@@ -258,6 +265,10 @@ const LoginForm: React.FC<{ note?: string; onSignedIn: (u: User) => void }> = ({
         body: JSON.stringify({ username: username.trim(), pin }),
       });
       if (res.status === 401) setError(t('Wrong username or PIN. Ask the office if you have forgotten your PIN.'));
+      else if (res.status === 429) {
+        const { minutes } = (await res.json().catch(() => ({}))) as { minutes?: number };
+        setError(t('Too many wrong PINs. Try again in {n} minutes, or ask the office to set a new PIN.', { n: minutes ?? 15 }));
+      }
       else if (!res.ok) setError(t('Could not sign in. Please try again.'));
       else {
         setPin('');

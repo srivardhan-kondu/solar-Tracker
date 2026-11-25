@@ -13,6 +13,8 @@ import {
   SEED_VILLAGES,
 } from '@/data/seedData';
 import { AllData, chronological, DbRecord, TABLE_NAMES, TableChanges, TableName, TABLES } from '@/lib/tables';
+import { IS_DEMO } from '@/lib/mode';
+import { hashPinForSetup } from './pinHash';
 
 /**
  * Connect only when a request needs the database, not while the app is being built.
@@ -142,6 +144,8 @@ const schemaStatements = (): string[] => {
   out.push(...PHOTO_SCHEMA);
   // Sign-in PINs (hashed). Kept out of the app's tables so they are never sent to any phone.
   out.push('create table if not exists user_pins (user_id text primary key, pin_hash text not null, updated_at timestamptz not null default now())');
+  // Wrong-PIN counts, so a PIN cannot be guessed by trying every number
+  out.push('create table if not exists login_attempts (username text primary key, failures int not null default 0, locked_until timestamptz, updated_at timestamptz not null default now())');
   return out;
 };
 
@@ -194,7 +198,34 @@ const seedQueries = () => TABLE_NAMES.map((t) => upsertQuery(t, chronological(t,
 
 let ready: Promise<void> | null = null;
 
-/** Create the tables and load the sample data the first time. Safe to call on every request. */
+/** Every statement that creates the tables, for this database or a backup copy */
+export const SCHEMA_STATEMENTS = schemaStatements;
+
+/**
+ * Production starts with one head-office account so someone can sign in and add everyone else.
+ * Its PIN comes from BOOTSTRAP_ADMIN_PIN, used once; the setting can be removed afterwards.
+ */
+const firstAdminQueries = async () => {
+  const pin = process.env.BOOTSTRAP_ADMIN_PIN;
+  if (!pin || !/^\d{4,8}$/.test(pin)) throw new Error('BOOTSTRAP_ADMIN_PIN (4 to 8 digits) is needed to create the first account');
+  const admin = {
+    id: 'usr_admin',
+    name: 'Head Office',
+    username: 'admin',
+    mobile: '',
+    role: 'Super Admin',
+    division: 'All Divisions',
+    district: 'Head Office',
+    status: 'Active',
+    lastLogin: '',
+  };
+  return [
+    upsertQuery('users', [admin]),
+    sql.query(`insert into user_pins (user_id, pin_hash) values ($1, $2) on conflict (user_id) do nothing`, ['usr_admin', await hashPinForSetup(pin)]),
+  ];
+};
+
+/** Create the tables, and the first time: sample data (demo) or the first account (production). Safe to call on every request. */
 export const ensureDb = () => {
   if (!ready) {
     ready = (async () => {
@@ -202,8 +233,10 @@ export const ensureDb = () => {
       const seeded = await sql.query(`select 1 from app_meta where key = 'seeded'`);
       if (seeded.length === 0) {
         await sql.transaction([
-          ...seedQueries(),
-          sql.query(`insert into app_meta (key, value) values ('seeded', now()::text) on conflict (key) do nothing`),
+          ...(IS_DEMO ? seedQueries() : await firstAdminQueries()),
+          sql.query(`insert into app_meta (key, value) values ('seeded', $1) on conflict (key) do nothing`, [
+            `${IS_DEMO ? 'demo data' : 'first account'} at ${new Date().toISOString()}`,
+          ]),
         ]);
       }
     })().catch((e) => {
@@ -238,8 +271,9 @@ export const applyChanges = async (changes: TableChanges[]) => {
   if (queries.length) await sql.transaction(queries);
 };
 
-/** Wipe everything and put the sample data back */
+/** Wipe everything and put the sample data back. Demo only: never on the production system. */
 export const resetToSeed = async () => {
+  if (!IS_DEMO) throw new Error('Reset is only possible on the demo');
   await ensureDb();
   await sql.transaction([sql.query(`truncate ${TABLE_NAMES.join(', ')}`), ...seedQueries()]);
 };

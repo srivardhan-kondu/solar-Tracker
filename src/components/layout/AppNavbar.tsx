@@ -6,8 +6,9 @@ import { Search, AlertTriangle, RotateCcw, ChevronDown, X, Languages, LogOut, Ma
 import { useApp } from '@/context/AppContext';
 import { isOfficeRole, ROLE_LABEL } from '@/lib/access';
 import { STATUS_LABEL } from '@/lib/status';
-import { Logo } from '@/components/brand/Logo';
+import { DemoBadge, Logo } from '@/components/brand/Logo';
 import { villageLabel, villagesOf } from '@/lib/workArea';
+import { IS_DEMO } from '@/lib/mode';
 
 
 interface AppNavbarProps {
@@ -63,6 +64,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
       <div className="max-w-[1480px] mx-auto px-3 sm:px-6">
         <div className="flex items-center justify-between min-h-[68px] sm:min-h-[76px] gap-2 sm:gap-4 py-2">
           <Logo />
+          {IS_DEMO && <DemoBadge />}
 
           {/* Search */}
           <div className="relative flex-1 max-w-lg hidden xl:block">
@@ -150,7 +152,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({ onNavigateToTab }) => {
             </button>
 
             {/* Reset demo data — Super Admin only */}
-            {currentUser.role === 'Super Admin' && (
+            {IS_DEMO && currentUser.role === 'Super Admin' && (
               <button
                 onClick={() => {
                   if (

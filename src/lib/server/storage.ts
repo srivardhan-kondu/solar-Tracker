@@ -3,9 +3,9 @@ import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 
-const BUCKET = process.env.S3_BUCKET || 'images';
+export const BUCKET = process.env.S3_BUCKET || 'images';
 
-const s3 = new S3Client({
+export const s3 = new S3Client({
   endpoint: process.env.AWS_ENDPOINT_URL_S3,
   region: process.env.AWS_REGION || 'us-east-2',
   forcePathStyle: true,

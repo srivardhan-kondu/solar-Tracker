@@ -1,10 +1,11 @@
 import 'server-only';
-import { createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'crypto';
-import { promisify } from 'util';
+import { createHmac } from 'crypto';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { ensureDb, sql } from './db';
 import { User } from '@/types';
+import { IS_DEMO } from '@/lib/mode';
+import { hashPinForSetup, pinMatchesHash, sameText } from './pinHash';
 
 /**
  * Sign-in: each person has a username and a PIN. After signing in, the phone keeps a signed
@@ -12,37 +13,30 @@ import { User } from '@/types';
  * Every server route reads the cookie to know who is asking.
  */
 
-const scrypt = promisify(scryptCb) as (pw: string, salt: Buffer, len: number) => Promise<Buffer>;
-
 const COOKIE = 'st_session';
 const SESSION_DAYS = 30;
 
+// Wrong PINs allowed before the username is locked for a while
+const MAX_FAILURES = 5;
+const LOCK_MINUTES = 15;
+
 const secret = () => {
-  const s = process.env.AUTH_SECRET || process.env.PHOTO_SIGNING_SECRET;
-  if (!s) throw new Error('AUTH_SECRET is not set');
+  // Production must have its own sign-in secret; the demo may borrow the photo secret
+  const s = process.env.AUTH_SECRET || (IS_DEMO ? process.env.PHOTO_SIGNING_SECRET : undefined);
+  if (!s || s.length < 32) throw new Error('AUTH_SECRET (at least 32 characters) is not set');
   return s;
 };
 
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64url');
 const unb64 = (s: string) => Buffer.from(s, 'base64url').toString('utf8');
 const mac = (payload: string) => createHmac('sha256', secret()).update(`session|${payload}`).digest('base64url');
-const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
+const same = sameText;
 
 /** A PIN is 4 to 8 digits */
 export const validPin = (pin: unknown): pin is string => typeof pin === 'string' && /^\d{4,8}$/.test(pin);
 
-export const hashPin = async (pin: string) => {
-  const salt = randomBytes(16);
-  const hash = await scrypt(pin, salt, 32);
-  return `s1$${salt.toString('base64url')}$${hash.toString('base64url')}`;
-};
-
-const pinMatches = async (pin: string, stored: string) => {
-  const [v, salt, hash] = stored.split('$');
-  if (v !== 's1' || !salt || !hash) return false;
-  const got = await scrypt(pin, Buffer.from(salt, 'base64url'), 32);
-  return same(got.toString('base64url'), hash);
-};
+export const hashPin = hashPinForSetup;
+const pinMatches = pinMatchesHash;
 
 export const setPin = async (userId: string, pin: string) => {
   await ensureDb();
@@ -58,22 +52,61 @@ const userById = async (id: string): Promise<User | null> => {
   return rows[0]?.data ?? null;
 };
 
+export type LoginResult = { user: User } | { locked: number } | null;
+
 /**
- * Check a username and PIN. A person with no PIN yet can use DEMO_PIN from the server settings,
- * if it is set (for first set-up only; the office then gives everyone their own PIN).
+ * Check a username and PIN. After MAX_FAILURES wrong PINs the username is locked for LOCK_MINUTES
+ * (returns the minutes left). On the demo only, a person with no PIN yet can use DEMO_PIN.
  */
-export const checkLogin = async (username: string, pin: string): Promise<User | null> => {
+export const checkLogin = async (username: string, pin: string): Promise<LoginResult> => {
   await ensureDb();
-  const rows = (await sql.query(`select data from users where lower(username) = lower($1)`, [username.trim()])) as { data: User }[];
+  const name = username.trim().toLowerCase();
+  const lock = (await sql.query(
+    `select ceil(extract(epoch from (locked_until - now())) / 60)::int as minutes from login_attempts where username = $1 and locked_until > now()`,
+    [name]
+  )) as { minutes: number }[];
+  if (lock[0]) return { locked: Math.max(1, lock[0].minutes) };
+
+  const rows = (await sql.query(`select data from users where lower(username) = $1`, [name])) as { data: User }[];
   const user = rows[0]?.data;
-  if (!user || user.status !== 'Active') {
+  let ok = false;
+  if (user && user.status === 'Active') {
+    const pins = (await sql.query(`select pin_hash from user_pins where user_id = $1`, [user.id])) as { pin_hash: string }[];
+    if (pins[0]) ok = await pinMatches(pin, pins[0].pin_hash);
+    else {
+      const demo = IS_DEMO ? process.env.DEMO_PIN : undefined;
+      ok = !!demo && validPin(demo) && same(pin, demo);
+    }
+  } else {
     await hashPin(pin); // same time taken whether or not the username exists
+  }
+
+  if (!ok) {
+    const r = (await sql.query(
+      `insert into login_attempts (username, failures) values ($1, 1)
+       on conflict (username) do update set
+         failures = case when login_attempts.locked_until is not null and login_attempts.locked_until <= now() then 1 else login_attempts.failures + 1 end,
+         locked_until = null, updated_at = now()
+       returning failures`,
+      [name]
+    )) as { failures: number }[];
+    if (r[0].failures >= MAX_FAILURES) {
+      await sql.query(`update login_attempts set locked_until = now() + ($2 || ' minutes')::interval where username = $1`, [name, String(LOCK_MINUTES)]);
+      return { locked: LOCK_MINUTES };
+    }
     return null;
   }
-  const pins = (await sql.query(`select pin_hash from user_pins where user_id = $1`, [user.id])) as { pin_hash: string }[];
-  if (pins[0]) return (await pinMatches(pin, pins[0].pin_hash)) ? user : null;
-  const demo = process.env.DEMO_PIN;
-  return demo && validPin(demo) && same(pin, demo) ? user : null;
+
+  await sql.query(`delete from login_attempts where username = $1`, [name]);
+  // "Last active" on the Users screen
+  const lastLogin = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' });
+  await sql.query(`update users set data = jsonb_set(data, '{lastLogin}', to_jsonb($2::text)), updated_at = now() where id = $1`, [user!.id, lastLogin]);
+  return { user: { ...user!, lastLogin } };
+};
+
+/** Clear a lock early, e.g. when the office sets a new PIN */
+export const clearLoginLock = async (username: string) => {
+  await sql.query(`delete from login_attempts where username = $1`, [username.trim().toLowerCase()]);
 };
 
 export const sessionCookieValue = (userId: string) => {

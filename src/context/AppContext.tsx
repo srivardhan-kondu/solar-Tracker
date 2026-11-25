@@ -30,6 +30,7 @@ import {
   SEED_SURVEYS,
 } from '@/data/seedData';
 import { useLang } from '@/i18n/LanguageContext';
+import { IS_DEMO } from '@/lib/mode';
 import { canInstall, reopenBlocker, surveyMissing } from '@/lib/survey';
 import { Refusal, SyncState, uploadPhoto, useServerSync } from '@/lib/serverSync';
 import { useAuth } from '@/components/auth/AuthGate';
@@ -93,6 +94,10 @@ interface AppContextType {
   saveVillage: (v: Omit<Village, 'id' | 'updatedBy' | 'updatedAt'> & { id?: string }) => void;
   /** Office: remove a village; it is taken away from every installer who had it */
   removeVillage: (id: string) => void;
+  /** Head office: add a person. Returns an error message, or null when added. */
+  addUser: (p: Pick<User, 'name' | 'username' | 'mobile' | 'role' | 'division'>) => string | null;
+  /** Head office: switch a person off (they can no longer sign in) or back on */
+  setUserStatus: (userId: string, status: User['status']) => void;
   reconcileDCRFile: (records: { ula: string; dcrNumber: string }[], fileName: string) => { matched: number; unmatched: number; conflicts: number };
   createServiceTicket: (ticket: Omit<ServiceTicket, 'id' | 'ticketNumber' | 'createdAt' | 'visitPhotos'>) => void;
   updateServiceTicketStatus: (ticketId: string, status: ServiceTicket['status'], notes?: string, photos?: string[]) => void;
@@ -122,25 +127,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Messages shown to people are translated; audit records stay in English.
   const { t } = useLang();
   const { user: sessionUser, signOut, signedOutByServer } = useAuth();
-  const [users, setUsers] = useState<User[]>(SEED_USERS);
+  const [users, setUsers] = useState<User[]>(IS_DEMO ? SEED_USERS : []);
   // The signed-in person, kept up to date when the office changes them (e.g. their work area)
   const currentUser = users.find((u) => u.id === sessionUser.id) ?? sessionUser;
   const [villages, setVillages] = useState<Village[]>([]);
   const [refusedChanges, setRefusedChanges] = useState<Refusal[]>([]);
-  const [consumers, setConsumers] = useState<Consumer[]>(SEED_CONSUMERS);
-  const [inventory, setInventory] = useState<EquipmentInventory[]>(SEED_INVENTORY);
-  const [installations, setInstallations] = useState<Installation[]>(SEED_INSTALLATIONS);
-  const [dcrRecords, setDcrRecords] = useState<DCRRecord[]>(SEED_DCR_RECORDS);
-  const [serviceTickets, setServiceTickets] = useState<ServiceTicket[]>(SEED_SERVICE_TICKETS);
-  const [exceptions, setExceptions] = useState<ActionRequiredException[]>(SEED_EXCEPTIONS);
-  const [auditLogs, setAuditLogs] = useState<AuditEvent[]>(SEED_AUDIT_LOGS);
+  const [consumers, setConsumers] = useState<Consumer[]>(IS_DEMO ? SEED_CONSUMERS : []);
+  const [inventory, setInventory] = useState<EquipmentInventory[]>(IS_DEMO ? SEED_INVENTORY : []);
+  const [installations, setInstallations] = useState<Installation[]>(IS_DEMO ? SEED_INSTALLATIONS : []);
+  const [dcrRecords, setDcrRecords] = useState<DCRRecord[]>(IS_DEMO ? SEED_DCR_RECORDS : []);
+  const [serviceTickets, setServiceTickets] = useState<ServiceTicket[]>(IS_DEMO ? SEED_SERVICE_TICKETS : []);
+  const [exceptions, setExceptions] = useState<ActionRequiredException[]>(IS_DEMO ? SEED_EXCEPTIONS : []);
+  const [auditLogs, setAuditLogs] = useState<AuditEvent[]>(IS_DEMO ? SEED_AUDIT_LOGS : []);
   const [offlineQueue, setOfflineQueue] = useState<OfflineSyncQueueItem[]>([]);
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [appMode, setAppMode] = useState<'admin' | 'mobile' | 'split'>('admin');
   const [installerDraft, setInstallerDraft] = useState<Installation | null>(null);
   const [activeStep, setActiveStep] = useState<number>(1);
   const [selectedConsumerFor360, setSelectedConsumerFor360] = useState<Consumer | null>(null);
-  const [surveys, setSurveys] = useState<SiteSurvey[]>(SEED_SURVEYS);
+  const [surveys, setSurveys] = useState<SiteSurvey[]>(IS_DEMO ? SEED_SURVEYS : []);
   const [mainStorageFull, setMainStorageFull] = useState(false);
   const [surveyStorageFull, setSurveyStorageFull] = useState(false);
 
@@ -808,6 +813,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logAudit(before ? 'UPDATE_VILLAGE' : 'ADD_VILLAGE', 'Village', village.id, `Village ${village.name} ${before ? 'changed' : 'added'} by ${currentUser.name}.`, where(before), where(village));
   };
 
+  const addUser = (p: Pick<User, 'name' | 'username' | 'mobile' | 'role' | 'division'>): string | null => {
+    if (currentUser.role !== 'Super Admin') return t('Only head office can add people.');
+    const username = p.username.trim().toLowerCase();
+    if (!p.name.trim()) return t('Enter the name.');
+    if (!/^[a-z0-9._-]{3,30}$/.test(username)) return t('Username: 3 to 30 letters or numbers (dots, dashes allowed), no spaces.');
+    if (users.some((u) => u.username.toLowerCase() === username)) return t('Username {name} is already taken.', { name: username });
+    const person: User = {
+      id: `usr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      name: p.name.trim(),
+      username,
+      mobile: p.mobile.trim(),
+      role: p.role,
+      division: p.division.trim(),
+      district: '',
+      status: 'Active',
+      lastLogin: '',
+      ...(p.role === 'Installer' ? { villageIds: [] } : {}),
+    };
+    setUsers((prev) => [...prev, person]);
+    logAudit('ADD_USER', 'User', person.id, `${person.name} (${person.role}, username ${person.username}) added by ${currentUser.name}.`);
+    return null;
+  };
+
+  const setUserStatus = (userId: string, status: User['status']) => {
+    const u = users.find((x) => x.id === userId);
+    if (!u || u.status === status || currentUser.role !== 'Super Admin' || userId === currentUser.id) return;
+    setUsers((prev) => prev.map((x) => (x.id === userId ? { ...x, status } : x)));
+    logAudit(status === 'Active' ? 'ENABLE_USER' : 'DISABLE_USER', 'User', userId, `${u.name} switched ${status === 'Active' ? 'on' : 'off'} by ${currentUser.name}.`, u.status, status);
+  };
+
   const removeVillage = (id: string) => {
     const before = villages.find((v) => v.id === id);
     if (!before) return;
@@ -1409,6 +1444,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setInstallerVillages,
         saveVillage,
         removeVillage,
+        addUser,
+        setUserStatus,
         reconcileDCRFile,
         createServiceTicket,
         updateServiceTicketStatus,

@@ -200,6 +200,21 @@ export const applyChangesAs = async (user: User, changes: TableChanges[]): Promi
     }
   }
 
+  // No two people may share a username (it is how they sign in)
+  const userChanges = allowed.find((c) => c.table === 'users');
+  if (userChanges?.upserts.length) {
+    const rows = (await sql.query(`select id, lower(username) as u from users`)) as { id: string; u: string }[];
+    const taken = new Map(rows.map((r) => [r.u, r.id]));
+    userChanges.upserts = userChanges.upserts.filter((r) => {
+      const u = typeof r.username === 'string' ? r.username.trim().toLowerCase() : '';
+      const other = taken.get(u);
+      const bad = !u || (other !== undefined && other !== r.id);
+      if (bad) refused.push({ table: 'users', id: r.id, reason: `Username ${u || '(empty)'} is already taken` });
+      else taken.set(u, r.id);
+      return !bad;
+    });
+  }
+
   await applyChanges(allowed);
   return refused;
 };

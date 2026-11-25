@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { notAllowed, notSignedIn, sessionUser, setPin, validPin } from '@/lib/server/session';
+import { clearLoginLock, notAllowed, notSignedIn, sessionUser, setPin, validPin } from '@/lib/server/session';
 import { sql } from '@/lib/server/db';
 import { User } from '@/types';
 
@@ -31,6 +31,7 @@ export async function POST(req: Request) {
       (me.role === 'Admin' && (target.role === 'Installer' || target.role === 'Service Engineer'));
     if (!allowed) return notAllowed('Only head office can set this PIN');
     await setPin(userId, pin);
+    await clearLoginLock(target.username);
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error('POST /api/auth/pin failed', e);
