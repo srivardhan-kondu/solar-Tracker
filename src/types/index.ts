@@ -165,6 +165,18 @@ export interface SurveyPhoto {
   geo?: GeoTag;
 }
 
+/** The APSPDCL consumer consent form, filled in and signed on the phone during the survey */
+export interface SurveyConsent {
+  address?: string;
+  roofAreaSqFt?: number;
+  caste?: 'SC' | 'ST';
+  /** Only the last 4 digits are kept, the same as on the Aadhaar photo */
+  aadhaarLast4?: string;
+  /** The consumer's signature, a PNG data URL. Cleared whenever the details above change. */
+  signature?: string;
+  signedAt?: string; // ISO time
+}
+
 export interface SiteSurvey {
   id: string;
   consumerNumber: string;
@@ -186,6 +198,8 @@ export interface SiteSurvey {
 
   decision?: SurveyDecision;
   decisionNote?: string; // required when Not Feasible
+
+  consent?: SurveyConsent; // needed when the home is Feasible
 
   // Set when office staff reopen a sent survey so the installer can redo it
   reopenedBy?: string;

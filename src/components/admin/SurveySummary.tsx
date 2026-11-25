@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { CheckCircle2, RotateCcw, XCircle } from 'lucide-react';
+import { CheckCircle2, FileSignature, RotateCcw, XCircle } from 'lucide-react';
+import { ConsentFormScreen } from './ConsentForm';
 import { useLang } from '@/i18n/LanguageContext';
 import { useApp } from '@/context/AppContext';
 import { isOfficeRole } from '@/lib/access';
@@ -44,12 +45,20 @@ export const SurveySummary: React.FC<{
   onOpenPhoto: (p: LabelledPhoto) => void;
 }> = ({ survey, onOpenPhoto }) => {
   const { t } = useLang();
+  const { consumers } = useApp();
+  const [consentOpen, setConsentOpen] = useState(false);
   const roof = ROOF_TYPES.find((r) => r.value === survey.roofType)?.label;
   const shade = SHADE_LEVELS.find((s) => s.value === survey.shadeLevel)?.label;
   const rows: [string, string][] = [
     ['Decision', ''],
     ['Type of roof', roof ? t(roof) : '—'],
     ['Shade on the roof', shade ? t(shade) : '—'],
+    ...(survey.decision === 'Feasible'
+      ? ([['Consent form', survey.consent?.signature ? t('Signed by the consumer') : t('Not signed')]] as [string, string][])
+      : []),
+    ...(survey.consent?.roofAreaSqFt
+      ? ([['Roof area given', `${survey.consent.roofAreaSqFt} sq ft`]] as [string, string][])
+      : []),
     ...(survey.shadeSources.length
       ? ([['Shade caused by', survey.shadeSources.map((x) => t(x)).join(', ')]] as [string, string][])
       : []),
@@ -72,6 +81,25 @@ export const SurveySummary: React.FC<{
           </div>
         ))}
       </div>
+
+      {survey.consent?.signature && (
+        <button
+          onClick={() => setConsentOpen(true)}
+          className="px-5 py-2.5 bg-white border-2 border-brand-300 text-brand-800 hover:bg-brand-50 rounded-xl text-sm font-bold flex items-center gap-2"
+        >
+          <FileSignature className="w-4 h-4" />
+          {t('View or print signed consent form')}
+        </button>
+      )}
+      {consentOpen && survey.consent && (
+        <ConsentFormScreen
+          consumer={consumers.find((c) => c.consumerNumber === survey.consumerNumber)}
+          consumerNumber={survey.consumerNumber}
+          consent={survey.consent}
+          collectedBy={survey.surveyorName}
+          onClose={() => setConsentOpen(false)}
+        />
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {surveyPhotoList(survey).map((item) => (

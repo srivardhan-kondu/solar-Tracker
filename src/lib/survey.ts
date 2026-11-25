@@ -1,4 +1,4 @@
-import { Consumer, Installation, RoofType, ShadeLevel, SiteSurvey } from '@/types';
+import { Consumer, Installation, RoofType, ShadeLevel, SiteSurvey, SurveyConsent } from '@/types';
 import { noTranslate, Translate } from '@/i18n/LanguageContext';
 import { hasGeo } from '@/lib/geoPhoto';
 
@@ -74,7 +74,19 @@ export const surveyMissing = (s: SiteSurvey | undefined, t: Translate = noTransl
   if (s.surroundingsPhotos.length === 0) out.push(t('At least 1 photo of the surroundings'));
   if (!s.decision) out.push(t('Your decision: Feasible or Not feasible'));
   if (s.decision === 'Not Feasible' && !s.decisionNote?.trim()) out.push(t('Reason why it is not feasible'));
+  if (s.decision === 'Feasible') out.push(...consentMissing(s.consent, t));
   const noGeo = [s.billPhoto, s.aadhaarPhoto, ...s.roofPhotos, ...s.surroundingsPhotos].filter((p) => p && !hasGeo(p)).length;
   if (noGeo) out.push(t('{n} photo(s) have no location — remove and take again', { n: noGeo }));
+  return out;
+};
+
+/** What is still needed on the consent form. Empty list = signed and complete. */
+export const consentMissing = (c: SurveyConsent | undefined, t: Translate = noTranslate): string[] => {
+  const out: string[] = [];
+  if (!c?.address?.trim()) out.push(t('Consent form: address'));
+  if (!c?.roofAreaSqFt || c.roofAreaSqFt <= 0) out.push(t('Consent form: roof area given'));
+  if (!c?.caste) out.push(t('Consent form: SC or ST'));
+  if (!c?.aadhaarLast4 || !/^\d{4}$/.test(c.aadhaarLast4)) out.push(t('Consent form: last 4 digits of Aadhaar'));
+  if (!c?.signature) out.push(t("Consent form: consumer's signature"));
   return out;
 };

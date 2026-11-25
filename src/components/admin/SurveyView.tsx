@@ -22,6 +22,7 @@ import {
   ROOF_TYPES,
   SHADE_LEVELS,
   SHADE_SOURCES,
+  consentMissing,
   needsSurvey,
   surveyFor,
   surveyMissing,
@@ -29,6 +30,7 @@ import {
 import { CameraCapture } from '@/components/camera/CameraCapture';
 import { PhotoVerification } from '@/components/camera/PhotoVerification';
 import { formatGeo, hasGeo, mapsLink } from '@/lib/geoPhoto';
+import { ConsentSection } from './ConsentForm';
 import { DecisionBadge, LabelledPhoto, ReopenedNotice, ReopenSurveyControl, SurveySummary } from './SurveySummary';
 
 const btnPrimary =
@@ -533,7 +535,11 @@ export const SurveyView: React.FC<{ onGoToInstallation: () => void }> = ({ onGoT
       {header}
       <ReopenedNotice survey={survey} />
       {storageWarning}
-      <p className="text-base text-slate-600 px-1">{t('Fill in all 5 parts. Your work is saved as you go.')}</p>
+      <p className="text-base text-slate-600 px-1">
+        {s.decision === 'Feasible'
+          ? t('Fill in all 6 parts. Your work is saved as you go.')
+          : t('Fill in all 5 parts. Your work is saved as you go.')}
+      </p>
 
       <Section num={1} title={t('Electricity bill')} done={!!s.billPhoto} hint={t('A clear photo of the latest bill. The consumer number must be readable.')}>
         {singlePhoto('billPhoto', 'Electricity bill')}
@@ -651,6 +657,23 @@ export const SurveyView: React.FC<{ onGoToInstallation: () => void }> = ({ onGoT
           </label>
         )}
       </Section>
+
+      {s.decision === 'Feasible' && (
+        <Section
+          num={6}
+          title={t('Consumer consent form')}
+          done={consentMissing(s.consent).length === 0}
+          hint={t('The APSPDCL consent form. Fill in the details, then the consumer reads it and signs on this phone.')}
+        >
+          <ConsentSection
+            consumer={consumer}
+            consumerNumber={openNum}
+            consent={s.consent}
+            collectedBy={currentUser.name}
+            onChange={(consent) => update((d) => ({ ...d, consent }))}
+          />
+        </Section>
+      )}
 
       {/* Send */}
       <div className="bg-white rounded-2xl border-2 border-slate-200 p-4 sm:p-6 space-y-4">
