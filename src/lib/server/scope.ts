@@ -6,13 +6,15 @@ import { Consumer, Installation, SiteSurvey, User, Village } from '@/types';
 import { checkVillages, formatDistance } from '@/lib/fence';
 import { villageLabel, villagesOf } from '@/lib/workArea';
 import { isOfficeRole } from '@/lib/access';
+import { surveyVillageCheck } from './settings';
 
 /**
  * What each person may see and change. The phone applies the same rules on screen;
  * these are the ones that count, because they run on the server.
  *
  * Installers: only the homes assigned to them, and every photo must be taken
- * inside one of the villages the office approved for them.
+ * inside one of the villages the office approved for them. (Survey photos can be let off
+ * the village check with SURVEY_VILLAGE_CHECK=false; see settings.ts. Installation photos never are.)
  */
 
 export interface Refusal {
@@ -138,7 +140,8 @@ const checkInstaller = async (user: User, changes: TableChanges[]) => {
             continue;
           }
           const fixes = photosOf(c.table, r).flatMap((p) => (p.geo ? [p.geo] : []));
-          const problem = outsideVillagesProblem(user, villages, fixes);
+          const villageCheck = c.table === 'installations' || surveyVillageCheck();
+          const problem = villageCheck ? outsideVillagesProblem(user, villages, fixes) : null;
           if (problem) { refuse(problem); continue; }
           if (c.table === 'surveys' && isFeasibleSurvey(r)) feasible.add(n);
           break;
@@ -241,6 +244,8 @@ export const photoUploadProblem = async (user: User, folder: string, consumerNum
   if (user.role !== 'Installer' || (folder !== 'surveys' && folder !== 'installations')) return null;
   const rows = (await sql.query(`select data from consumers where consumer_number = $1`, [consumerNumber])) as { data: Consumer }[];
   if (rows[0]?.data.assignedInstallerId !== user.id) return 'This home is not assigned to you';
+  // The photo's own location is always checked (photos.ts); this is only "inside your villages"
+  if (folder === 'surveys' && !surveyVillageCheck()) return null;
   return outsideVillagesProblem(user, await allVillages(), [fix]);
 };
 
@@ -250,7 +255,12 @@ export const photoUploadProblem = async (user: User, folder: string, consumerNum
 export interface NewHomeDetails {
   name: string;
   mobile: string;
+  /** One of the installer's approved villages (when the village check is on) */
   villageId: string;
+  /** Typed by the installer when the village check is on hold */
+  village: string;
+  mandal: string;
+  district: string;
   /** Solar size applied for, in kW */
   capacityKw: number;
   /** Application (ULA) number, if the applicant has it */
@@ -311,11 +321,23 @@ export const takeHomeForSurvey = async (user: User, rawNumber: string, details: 
     return { problem: 'Please type the solar size in kW (for example 3).', field: 'capacityKw' };
   const ula = details.ula.trim().slice(0, 60);
 
-  // Survey photos must be taken inside the installer's approved villages
-  const mine = villagesOf(user, await allVillages());
-  if (!mine.length) return { problem: 'The office has not given you any villages yet. Ask them to add your villages first.' };
-  const village = mine.find((v) => v.id === details.villageId);
-  if (!village) return { problem: 'Please choose one of your villages.', field: 'villageId' };
+  // Where the home is. Normally one of the installer's approved villages (survey photos must be taken there).
+  // With the village check on hold, the installer types the village, mandal and district.
+  const text = (s: string) => s.trim().replace(/\s+/g, ' ').slice(0, 80);
+  let place: { village: string; mandal: string; district: string; label: string };
+  if (surveyVillageCheck()) {
+    const mine = villagesOf(user, await allVillages());
+    if (!mine.length) return { problem: 'The office has not given you any villages yet. Ask them to add your villages first.' };
+    const v = mine.find((x) => x.id === details.villageId);
+    if (!v) return { problem: 'Please choose one of your villages.', field: 'villageId' };
+    place = { village: v.name, mandal: v.mandal ?? '', district: v.district ?? user.district ?? '', label: villageLabel(v) };
+  } else {
+    const [village, mandal, district] = [text(details.village), text(details.mandal), text(details.district)];
+    if (village.length < 2) return { problem: 'Please type the village name.', field: 'village' };
+    if (mandal.length < 2) return { problem: 'Please type the mandal.', field: 'mandal' };
+    if (district.length < 2) return { problem: 'Please type the district.', field: 'district' };
+    place = { village, mandal, district, label: `${village} (${mandal} mandal, ${district} district)` };
+  }
 
   const home = await findHome(consumerNumber);
   if (home) {
@@ -330,13 +352,13 @@ export const takeHomeForSurvey = async (user: User, rawNumber: string, details: 
       // The office's details stay; the installer's fill only what the list left empty
       ...(home.name?.trim() ? {} : { name }),
       ...(home.mobile?.trim() ? {} : { mobile }),
-      ...(home.village?.trim() ? {} : { village: village.name, mandal: village.mandal ?? '', district: village.district ?? user.district ?? '' }),
+      ...(home.village?.trim() ? {} : { village: place.village, mandal: place.mandal, district: place.district }),
       ...(home.capacityKw > 0 ? {} : { capacityKw }),
       ...(home.ula?.trim() || !ula ? {} : { ula }),
     };
     const saved = await takeHome(
       { claim: { id: home.id, patch, installerId: user.id } },
-      auditFor(user, home.consumerNumber, `${user.name} started a new survey on their own and took ${home.consumerNumber} (${home.name || name}, ${home.village || village.name}).`)
+      auditFor(user, home.consumerNumber, `${user.name} started a new survey on their own and took ${home.consumerNumber} (${home.name || name}, ${home.village || place.village}).`)
     );
     if (saved) return { consumer: saved as unknown as Consumer, added: false, alreadyYours: false };
     // Someone else took it a moment ago
@@ -350,9 +372,9 @@ export const takeHomeForSurvey = async (user: User, rawNumber: string, details: 
     consumerNumber,
     name,
     mobile,
-    village: village.name,
-    mandal: village.mandal ?? '',
-    district: village.district ?? user.district ?? '',
+    village: place.village,
+    mandal: place.mandal,
+    district: place.district,
     division: user.division ?? '',
     ula,
     status: 'Assigned',
@@ -365,7 +387,7 @@ export const takeHomeForSurvey = async (user: User, rawNumber: string, details: 
   };
   const saved = await takeHome(
     { add: consumer as unknown as DbRecord },
-    auditFor(user, consumerNumber, `${user.name} started a new survey and added a home that was not in the consumer list: ${consumerNumber} (${name}, ${villageLabel(village)}, ${mobile}, ${capacityKw} kW${ula ? `, ULA ${ula}` : ''}).`)
+    auditFor(user, consumerNumber, `${user.name} started a new survey and added a home that was not in the consumer list: ${consumerNumber} (${name}, ${place.label}, ${mobile}, ${capacityKw} kW${ula ? `, ULA ${ula}` : ''}).`)
   );
   if (saved) return { consumer: saved as unknown as Consumer, added: true, alreadyYours: false };
   const now = await findHome(consumerNumber);

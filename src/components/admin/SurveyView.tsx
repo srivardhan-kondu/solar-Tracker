@@ -52,6 +52,7 @@ const PhotoPicker: React.FC<{ onPicked: (photo: SurveyPhoto) => void; title: str
   stampAddress,
 }) => {
   const { t } = useLang();
+  const { surveyVillageCheck } = useApp();
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -64,6 +65,7 @@ const PhotoPicker: React.FC<{ onPicked: (photo: SurveyPhoto) => void; title: str
           title={title}
           stampLabel={stampLabel}
           stampAddress={stampAddress}
+          villageCheck={surveyVillageCheck}
           onClose={() => setOpen(false)}
           onCapture={(shot) => {
             setOpen(false);
@@ -197,13 +199,16 @@ const fieldCls = 'w-full px-4 py-3 bg-white border-2 rounded-xl text-base';
  */
 const NewSurvey: React.FC<{ onStarted: (consumerNumber: string, message: string) => void }> = ({ onStarted }) => {
   const { t } = useLang();
-  const { startOwnSurvey, villages, currentUser } = useApp();
+  const { startOwnSurvey, villages, currentUser, surveyVillageCheck } = useApp();
+  // With the village check on hold, the installer types where the home is
+  const typePlace = !surveyVillageCheck;
   const myVillages = villagesOf(currentUser, villages);
   const [formOpen, setFormOpen] = useState(false);
   const [number, setNumber] = useState('');
   const [name, setName] = useState('');
   const [mobile, setMobile] = useState('');
   const [villageId, setVillageId] = useState(myVillages.length === 1 ? myVillages[0].id : '');
+  const [placeText, setPlaceText] = useState({ village: '', mandal: '', district: '' });
   const [capacity, setCapacity] = useState('');
   const [ula, setUla] = useState('');
   const [busy, setBusy] = useState(false);
@@ -216,6 +221,7 @@ const NewSurvey: React.FC<{ onStarted: (consumerNumber: string, message: string)
     setName('');
     setMobile('');
     setVillageId(myVillages.length === 1 ? myVillages[0].id : '');
+    setPlaceText({ village: '', mandal: '', district: '' });
     setCapacity('');
     setUla('');
     setError(null);
@@ -229,7 +235,13 @@ const NewSurvey: React.FC<{ onStarted: (consumerNumber: string, message: string)
       ? 'name'
       : !mobile.trim()
       ? 'mobile'
-      : !villageId
+      : typePlace && !placeText.village.trim()
+      ? 'village'
+      : typePlace && !placeText.mandal.trim()
+      ? 'mandal'
+      : typePlace && !placeText.district.trim()
+      ? 'district'
+      : !typePlace && !villageId
       ? 'villageId'
       : !capacity.trim()
       ? 'capacityKw'
@@ -240,7 +252,7 @@ const NewSurvey: React.FC<{ onStarted: (consumerNumber: string, message: string)
     }
     setBusy(true);
     setError(null);
-    const res = await startOwnSurvey(number, { name, mobile, villageId, capacityKw: Number(capacity.replace(',', '.')), ula });
+    const res = await startOwnSurvey(number, { name, mobile, villageId: typePlace ? '' : villageId, ...placeText, capacityKw: Number(capacity.replace(',', '.')), ula });
     setBusy(false);
     if (!res.ok) {
       setError({ message: res.message, field: res.field });
@@ -259,7 +271,7 @@ const NewSurvey: React.FC<{ onStarted: (consumerNumber: string, message: string)
     );
   }
 
-  if (!myVillages.length) {
+  if (!typePlace && !myVillages.length) {
     return (
       <div className="bg-white rounded-2xl border-2 border-amber-300 p-5 space-y-3" role="alert">
         <div className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -319,20 +331,36 @@ const NewSurvey: React.FC<{ onStarted: (consumerNumber: string, message: string)
             className={`${fieldCls} ${border('mobile')}`}
           />
         </label>
-        <label className="block space-y-1.5">
-          <span className="text-base font-bold text-slate-800">{t('Village')}</span>
-          <select value={villageId} onChange={(e) => setVillageId(e.target.value)} className={`${fieldCls} ${border('villageId')}`}>
-            <option value="">{t('Choose village')}</option>
-            {myVillages.map((v) => (
-              <option key={v.id} value={v.id}>
-                {villageLabel(v)}
-              </option>
+        {typePlace ? (
+          <>
+            {(['village', 'mandal', 'district'] as const).map((f) => (
+              <label key={f} className="block space-y-1.5">
+                <span className="text-base font-bold text-slate-800">{t(f === 'village' ? 'Village' : f === 'mandal' ? 'Mandal' : 'District')}</span>
+                <input
+                  value={placeText[f]}
+                  onChange={(e) => setPlaceText((p) => ({ ...p, [f]: e.target.value }))}
+                  autoComplete="off"
+                  className={`${fieldCls} ${border(f)}`}
+                />
+              </label>
             ))}
-          </select>
-          {village && (village.mandal || village.district) && (
-            <span className="block text-sm text-slate-500">{[village.mandal, village.district].filter(Boolean).join(', ')}</span>
-          )}
-        </label>
+          </>
+        ) : (
+          <label className="block space-y-1.5">
+            <span className="text-base font-bold text-slate-800">{t('Village')}</span>
+            <select value={villageId} onChange={(e) => setVillageId(e.target.value)} className={`${fieldCls} ${border('villageId')}`}>
+              <option value="">{t('Choose village')}</option>
+              {myVillages.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {villageLabel(v)}
+                </option>
+              ))}
+            </select>
+            {village && (village.mandal || village.district) && (
+              <span className="block text-sm text-slate-500">{[village.mandal, village.district].filter(Boolean).join(', ')}</span>
+            )}
+          </label>
+        )}
         <label className="block space-y-1.5">
           <span className="text-base font-bold text-slate-800">{t('Solar size (kW)')}</span>
           <input

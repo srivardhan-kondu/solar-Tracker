@@ -921,4 +921,8 @@ export const TE: Record<string, string> = {
   'Application (ULA) number': 'దరఖాస్తు (ULA) నంబర్',
   'Leave empty if the applicant does not have it yet.': 'దరఖాస్తుదారుకు ఇంకా లేకపోతే ఖాళీగా వదలండి.',
   'Please type the solar size in kW (for example 3).': 'సోలార్ సామర్థ్యం kWలో టైప్ చేయండి (ఉదా. 3).',
+  'District': 'జిల్లా',
+  'Please type the village name.': 'గ్రామం పేరు టైప్ చేయండి.',
+  'Please type the mandal.': 'మండలం టైప్ చేయండి.',
+  'Please type the district.': 'జిల్లా టైప్ చేయండి.',
 };

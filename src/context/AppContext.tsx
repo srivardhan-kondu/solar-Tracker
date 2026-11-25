@@ -68,6 +68,11 @@ interface AppContextType {
   storageFull: boolean;
   /** Whether everything has been saved to the server */
   syncState: SyncState;
+  /**
+   * Must survey photos be taken inside the installer's approved villages? Set on the server
+   * (SURVEY_VILLAGE_CHECK). Photos always carry their GPS location either way.
+   */
+  surveyVillageCheck: boolean;
 
   // Setters & Actions
   /** Sign out. Returns false (and does nothing) while this phone has work not yet sent. */
@@ -125,7 +130,12 @@ interface AppContextType {
 export interface NewHomeDetails {
   name: string;
   mobile: string;
+  /** One of the installer's approved villages (when the village check is on) */
   villageId: string;
+  /** Typed by the installer when the village check is on hold */
+  village: string;
+  mandal: string;
+  district: string;
   /** Solar size applied for, in kW */
   capacityKw: number;
   /** Application (ULA) number, if the applicant has it */
@@ -141,6 +151,8 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const STORAGE_KEY = 'SOLAR_TRACKER_DATA_V1';
 // Surveys hold photos, so they are kept apart from the rest of the data
 const SURVEY_STORAGE_KEY = 'SOLAR_TRACKER_SURVEYS_V1';
+// Switches from the server (see /api/settings), kept for when the phone is offline
+const SETTINGS_KEY = 'SOLAR_TRACKER_SETTINGS_V1';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Messages shown to people are translated; audit records stay in English.
@@ -166,6 +178,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedConsumerFor360, setSelectedConsumerFor360] = useState<Consumer | null>(null);
   const [surveys, setSurveys] = useState<SiteSurvey[]>(IS_DEMO ? SEED_SURVEYS : []);
   const [mainStorageFull, setMainStorageFull] = useState(false);
+  // On until the server says otherwise (the safe choice when offline)
+  const [surveyVillageCheck, setSurveyVillageCheck] = useState(true);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SETTINGS_KEY);
+      if (saved) setSurveyVillageCheck(JSON.parse(saved).surveyVillageCheck !== false);
+    } catch {
+      /* ignore */
+    }
+    let cancelled = false;
+    const load = () =>
+      fetch('/api/settings', { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((s: { surveyVillageCheck?: boolean } | null) => {
+          if (!s || cancelled) return;
+          setSurveyVillageCheck(s.surveyVillageCheck !== false);
+          try {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+          } catch {
+            /* ignore */
+          }
+        })
+        .catch(() => {});
+    void load();
+    window.addEventListener('focus', load);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', load);
+    };
+  }, []);
   const [surveyStorageFull, setSurveyStorageFull] = useState(false);
 
   // Load from localStorage on mount
@@ -1472,6 +1514,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         surveys,
         villages,
         refusedChanges,
+        surveyVillageCheck,
         clearRefusedChanges: () => setRefusedChanges([]),
         storageFull: mainStorageFull || surveyStorageFull,
         syncState,

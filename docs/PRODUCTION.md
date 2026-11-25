@@ -71,3 +71,12 @@ Production needs: `NEXT_PUBLIC_APP_MODE`, `DATABASE_URL`, `AUTH_SECRET`, `PHOTO_
 
 Changing `PHOTO_SIGNING_SECRET` marks every earlier photo as unverified. Changing `AUTH_SECRET`
 signs everyone out.
+
+### Switches
+
+| Setting | Values | What it does |
+|---|---|---|
+| `SURVEY_VILLAGE_CHECK` | `true` (or not set) / `false` | `true`: survey photos must be taken inside the installer's approved villages. `false`: **on hold**. Installers can survey anywhere and don't need villages from the office; on **New survey** they type the village, mandal and district. Every photo still needs a fresh, precise GPS location, printed on it and kept in its signed record. Installation photos are always checked. |
+
+A changed setting takes effect after a redeploy: Vercel → project → Deployments → latest → Redeploy.
+Phones pick it up the next time the app is opened or comes back to the front.

@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * "New survey": an installer types a home's details and surveys it, without the office assigning it.
- * Body: { consumerNumber, details: { name, mobile, villageId, capacityKw, ula } }.
+ * Body: { consumerNumber, details: { name, mobile, villageId or village/mandal/district, capacityKw, ula } }.
  * Returns { consumer, added, alreadyYours } or { problem, field? }.
  */
 export async function POST(req: Request) {
@@ -22,6 +22,9 @@ export async function POST(req: Request) {
     name: String(d?.name ?? ''),
     mobile: String(d?.mobile ?? ''),
     villageId: String(d?.villageId ?? ''),
+    village: String(d?.village ?? ''),
+    mandal: String(d?.mandal ?? ''),
+    district: String(d?.district ?? ''),
     capacityKw: Number(d?.capacityKw),
     ula: String(d?.ula ?? ''),
   };

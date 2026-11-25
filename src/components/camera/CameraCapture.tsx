@@ -23,7 +23,8 @@ type Fix = { latitude: number; longitude: number; accuracy: number; at: number }
  * Full-screen camera inside the app. This is the only way to add a photo:
  * there is no file picker, so photos cannot be uploaded from the phone's gallery or a computer.
  * The shutter works only once the phone knows where it is, and the location is printed on the photo.
- * For installers, the shutter also works only inside one of the villages the office gave them.
+ * For installers, the shutter also works only inside one of the villages the office gave them
+ * (unless `villageCheck` is false: survey photos while SURVEY_VILLAGE_CHECK is on hold).
  */
 export const CameraCapture: React.FC<{
   /** Printed on the photo, e.g. "AP-GNT-2026-003 · Roof photo 1" */
@@ -33,10 +34,12 @@ export const CameraCapture: React.FC<{
   title: string;
   onCapture: (photo: CapturedPhoto) => void;
   onClose: () => void;
-}> = ({ stampLabel, stampAddress, title, onCapture, onClose }) => {
+  /** Must the photo be inside the installer's villages? Default yes. The location is required and printed either way. */
+  villageCheck?: boolean;
+}> = ({ stampLabel, stampAddress, title, onCapture, onClose, villageCheck = true }) => {
   const { t } = useLang();
   const { currentUser, villages } = useApp();
-  const limited = isLimitedToVillages(currentUser);
+  const limited = villageCheck && isLimitedToVillages(currentUser);
   const myVillages = limited ? villagesOf(currentUser, villages) : [];
   const videoRef = useRef<HTMLVideoElement>(null);
   const [attempt, setAttempt] = useState(0);
