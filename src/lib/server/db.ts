@@ -144,6 +144,8 @@ const schemaStatements = (): string[] => {
   out.push(...PHOTO_SCHEMA);
   // Sign-in PINs (hashed). Kept out of the app's tables so they are never sent to any phone.
   out.push('create table if not exists user_pins (user_id text primary key, pin_hash text not null, updated_at timestamptz not null default now())');
+  // No two people may share a username, even if two offices add someone at the same moment
+  out.push('create unique index if not exists users_username_unique on users (lower(username))');
   // Wrong-PIN counts, so a PIN cannot be guessed by trying every number
   out.push('create table if not exists login_attempts (username text primary key, failures int not null default 0, locked_until timestamptz, updated_at timestamptz not null default now())');
   return out;
@@ -269,6 +271,15 @@ export const applyChanges = async (changes: TableChanges[]) => {
     if (c.upserts.length) queries.push(upsertQuery(c.table, c.upserts));
   }
   if (queries.length) await sql.transaction(queries);
+};
+
+/** Add a person and their sign-in PIN together (both or neither) */
+export const createUserWithPin = async (user: DbRecord, pinHash: string) => {
+  await ensureDb();
+  await sql.transaction([
+    upsertQuery('users', [user]),
+    sql.query(`insert into user_pins (user_id, pin_hash) values ($1, $2) on conflict (user_id) do update set pin_hash = excluded.pin_hash, updated_at = now()`, [user.id, pinHash]),
+  ]);
 };
 
 /** Wipe everything and put the sample data back. Demo only: never on the production system. */

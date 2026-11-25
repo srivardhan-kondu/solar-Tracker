@@ -35,6 +35,7 @@ import { canInstall, reopenBlocker, surveyMissing } from '@/lib/survey';
 import { Refusal, SyncState, uploadPhoto, useServerSync } from '@/lib/serverSync';
 import { useAuth } from '@/components/auth/AuthGate';
 import { villageLabel } from '@/lib/workArea';
+import { NewPerson } from '@/lib/onboarding';
 import { hasGeo } from '@/lib/geoPhoto';
 import { normalizeMobile, sameMobile } from '@/lib/mobile';
 import { resumeStep } from '@/lib/installationSteps';
@@ -94,8 +95,8 @@ interface AppContextType {
   saveVillage: (v: Omit<Village, 'id' | 'updatedBy' | 'updatedAt'> & { id?: string }) => void;
   /** Office: remove a village; it is taken away from every installer who had it */
   removeVillage: (id: string) => void;
-  /** Head office: add a person. Returns an error message, or null when added. */
-  addUser: (p: Pick<User, 'name' | 'username' | 'mobile' | 'role' | 'division'>) => string | null;
+  /** Office: onboard an employee with their details and sign-in PIN (saved on the server at once) */
+  onboardUser: (p: NewPerson) => Promise<{ user: User } | { problems: Partial<Record<keyof NewPerson, string>> } | { error: string }>;
   /** Head office: switch a person off (they can no longer sign in) or back on */
   setUserStatus: (userId: string, status: User['status']) => void;
   reconcileDCRFile: (records: { ula: string; dcrNumber: string }[], fileName: string) => { matched: number; unmatched: number; conflicts: number };
@@ -813,27 +814,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logAudit(before ? 'UPDATE_VILLAGE' : 'ADD_VILLAGE', 'Village', village.id, `Village ${village.name} ${before ? 'changed' : 'added'} by ${currentUser.name}.`, where(before), where(village));
   };
 
-  const addUser = (p: Pick<User, 'name' | 'username' | 'mobile' | 'role' | 'division'>): string | null => {
-    if (currentUser.role !== 'Super Admin') return t('Only head office can add people.');
-    const username = p.username.trim().toLowerCase();
-    if (!p.name.trim()) return t('Enter the name.');
-    if (!/^[a-z0-9._-]{3,30}$/.test(username)) return t('Username: 3 to 30 letters or numbers (dots, dashes allowed), no spaces.');
-    if (users.some((u) => u.username.toLowerCase() === username)) return t('Username {name} is already taken.', { name: username });
-    const person: User = {
-      id: `usr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      name: p.name.trim(),
-      username,
-      mobile: p.mobile.trim(),
-      role: p.role,
-      division: p.division.trim(),
-      district: '',
-      status: 'Active',
-      lastLogin: '',
-      ...(p.role === 'Installer' ? { villageIds: [] } : {}),
-    };
-    setUsers((prev) => [...prev, person]);
-    logAudit('ADD_USER', 'User', person.id, `${person.name} (${person.role}, username ${person.username}) added by ${currentUser.name}.`);
-    return null;
+  const onboardUser = async (p: NewPerson) => {
+    let res: Response;
+    try {
+      res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) });
+    } catch {
+      return { error: t('Cannot reach the server. Connect to the internet and try again.') };
+    }
+    const body = (await res.json().catch(() => ({}))) as { user?: User; problems?: Partial<Record<keyof NewPerson, string>>; error?: string };
+    if (res.ok && body.user) {
+      const person = body.user;
+      setUsers((prev) => [...prev.filter((u) => u.id !== person.id), person]);
+      logAudit('ONBOARD_USER', 'User', person.id, `${person.name} (${person.role}, username ${person.username}) onboarded by ${currentUser.name}.`);
+      return { user: person };
+    }
+    if (body.problems) return { problems: body.problems };
+    return { error: t(body.error || 'Could not add the person') };
   };
 
   const setUserStatus = (userId: string, status: User['status']) => {
@@ -1444,7 +1440,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setInstallerVillages,
         saveVillage,
         removeVillage,
-        addUser,
+        onboardUser,
         setUserStatus,
         reconcileDCRFile,
         createServiceTicket,

@@ -36,7 +36,8 @@ const ALL_TABS: TabId[] = [
 /** Which screens each role sees. Field staff get a short, focused menu. */
 export const TABS_FOR_ROLE: Record<UserRole, TabId[]> = {
   'Super Admin': ALL_TABS,
-  Admin: ALL_TABS.filter((t) => t !== 'user_management'),
+  // Office staff can onboard installers and service engineers on the Users screen
+  Admin: ALL_TABS,
   // Survey comes first: a home is installed only after the survey says it is feasible
   Installer: ['survey', 'field_portal', 'installations'],
   'Service Engineer': ['service_desk', 'installations'],

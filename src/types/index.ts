@@ -11,6 +11,14 @@ export interface User {
   status: 'Active' | 'Inactive';
   lastLogin: string;
   avatar?: string;
+  /** Employee details, filled in when the office onboards the person */
+  employeeId?: string;
+  address?: string;
+  joiningDate?: string; // YYYY-MM-DD
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  onboardedBy?: string;
+  onboardedAt?: string;
   /** Installers only: the villages the office allows them to work in. None = cannot work anywhere. */
   villageIds?: string[];
   accessUpdatedBy?: string;
