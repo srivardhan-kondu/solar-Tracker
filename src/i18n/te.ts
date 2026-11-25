@@ -925,4 +925,5 @@ export const TE: Record<string, string> = {
   'Please type the village name.': 'గ్రామం పేరు టైప్ చేయండి.',
   'Please type the mandal.': 'మండలం టైప్ చేయండి.',
   'Please type the district.': 'జిల్లా టైప్ చేయండి.',
+  'New survey is switched off. The office will give you homes to survey.': 'కొత్త సర్వే ఆపివేయబడింది. సర్వే చేయాల్సిన ఇళ్లను ఆఫీసు మీకు ఇస్తుంది.',
 };

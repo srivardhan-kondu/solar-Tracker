@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { notAllowed, notSignedIn, sessionUser } from '@/lib/server/session';
 import { NewHomeDetails, takeHomeForSurvey } from '@/lib/server/scope';
+import { installerNewSurvey } from '@/lib/server/settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,8 @@ export async function POST(req: Request) {
     const user = await sessionUser();
     if (!user) return notSignedIn();
     if (user.role !== 'Installer') return notAllowed('Only installers start surveys this way');
+    // Switched off (INSTALLER_NEW_SURVEY=false): only the office gives out homes
+    if (!installerNewSurvey()) return NextResponse.json({ problem: 'New survey is switched off. The office will give you homes to survey.' });
     return NextResponse.json(await takeHomeForSurvey(user, body.consumerNumber, details));
   } catch (e) {
     console.error('POST /api/surveys/start failed', e);

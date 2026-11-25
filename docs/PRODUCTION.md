@@ -77,6 +77,9 @@ signs everyone out.
 | Setting | Values | What it does |
 |---|---|---|
 | `SURVEY_VILLAGE_CHECK` | `true` (or not set) / `false` | `true`: survey photos must be taken inside the installer's approved villages. `false`: **on hold**. Installers can survey anywhere and don't need villages from the office; on **New survey** they type the village, mandal and district. Every photo still needs a fresh, precise GPS location, printed on it and kept in its signed record. Installation photos are always checked. |
+| `INSTALLER_NEW_SURVEY` | `true` (or not set) / `false` | `true`: installers see **+ New survey** and can survey any home without the office assigning it. `false`: the button is gone and the server refuses self-started surveys; only homes the office assigns are surveyed. Homes installers already took keep their surveys; the office can reassign them as usual. |
+
+To go back to how it was before installers could start surveys: `INSTALLER_NEW_SURVEY=false` and `SURVEY_VILLAGE_CHECK=true`.
 
 A changed setting takes effect after a redeploy: Vercel → project → Deployments → latest → Redeploy.
 Phones pick it up the next time the app is opened or comes back to the front.

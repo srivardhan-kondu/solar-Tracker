@@ -12,10 +12,18 @@ import 'server-only';
  *   villages from the office. Every photo still needs a fresh, precise GPS location, which is
  *   printed on it and kept in its signed record. Installation photos are always checked.
  */
-export const surveyVillageCheck = () => {
-  const v = (process.env.SURVEY_VILLAGE_CHECK ?? '').trim().toLowerCase();
-  return !['false', '0', 'off', 'no'].includes(v);
-};
+/** On unless set to false / 0 / off / no */
+const onUnlessOff = (name: string) => !['false', '0', 'off', 'no'].includes((process.env[name] ?? '').trim().toLowerCase());
+
+export const surveyVillageCheck = () => onUnlessOff('SURVEY_VILLAGE_CHECK');
+
+/**
+ * INSTALLER_NEW_SURVEY: may installers start a survey on their own ("New survey")?
+ * - true (or not set): yes. They fill in the applicant's details and survey any home.
+ * - false: no. Only homes the office assigns are surveyed, as before. Homes installers
+ *   already took keep their surveys; the office can reassign them as usual.
+ */
+export const installerNewSurvey = () => onUnlessOff('INSTALLER_NEW_SURVEY');
 
 /** What the phone needs to know */
-export const appSettings = () => ({ surveyVillageCheck: surveyVillageCheck() });
+export const appSettings = () => ({ surveyVillageCheck: surveyVillageCheck(), installerNewSurvey: installerNewSurvey() });

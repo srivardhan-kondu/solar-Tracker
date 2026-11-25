@@ -403,7 +403,9 @@ const NewSurvey: React.FC<{ onStarted: (consumerNumber: string, message: string)
 
 export const SurveyView: React.FC<{ onGoToInstallation: () => void }> = ({ onGoToInstallation }) => {
   const { t } = useLang();
-  const { consumers, currentUser, surveys, installations, updateSurveyDraft, submitSurvey, storageFull } = useApp();
+  const { consumers, currentUser, surveys, installations, updateSurveyDraft, submitSurvey, storageFull, installerNewSurvey } = useApp();
+  // "New survey" can be switched off on the server (INSTALLER_NEW_SURVEY=false)
+  const canStartOwn = currentUser.role === 'Installer' && installerNewSurvey;
   const [openNum, setOpenNum] = useState<string | null>(null);
   const [preview, setPreview] = useState<LabelledPhoto | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -498,7 +500,7 @@ export const SurveyView: React.FC<{ onGoToInstallation: () => void }> = ({ onGoT
 
         {storageWarning}
 
-        {currentUser.role === 'Installer' && (
+        {canStartOwn && (
           <NewSurvey
             onStarted={(num, msg) => {
               open(num);
@@ -518,7 +520,7 @@ export const SurveyView: React.FC<{ onGoToInstallation: () => void }> = ({ onGoT
           <h2 className="text-lg font-bold text-slate-900">{t('Homes to survey ({n})', { n: toSurvey.length })}</h2>
           {toSurvey.length === 0 ? (
             <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-base text-slate-600">
-              {currentUser.role === 'Installer'
+              {canStartOwn
                 ? t('No homes are waiting for a survey. Tap "New survey" above to survey any home.')
                 : t('No homes are waiting for a survey. Ask the office if you expected one.')}
             </div>

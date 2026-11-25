@@ -73,6 +73,8 @@ interface AppContextType {
    * (SURVEY_VILLAGE_CHECK). Photos always carry their GPS location either way.
    */
   surveyVillageCheck: boolean;
+  /** May installers start a survey on their own? Set on the server (INSTALLER_NEW_SURVEY). */
+  installerNewSurvey: boolean;
 
   // Setters & Actions
   /** Sign out. Returns false (and does nothing) while this phone has work not yet sent. */
@@ -178,12 +180,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedConsumerFor360, setSelectedConsumerFor360] = useState<Consumer | null>(null);
   const [surveys, setSurveys] = useState<SiteSurvey[]>(IS_DEMO ? SEED_SURVEYS : []);
   const [mainStorageFull, setMainStorageFull] = useState(false);
-  // On until the server says otherwise (the safe choice when offline)
+  // Switches from the server. Village check on until the server says otherwise (the safe choice when offline).
   const [surveyVillageCheck, setSurveyVillageCheck] = useState(true);
+  const [installerNewSurvey, setInstallerNewSurvey] = useState(true);
   useEffect(() => {
     try {
       const saved = localStorage.getItem(SETTINGS_KEY);
-      if (saved) setSurveyVillageCheck(JSON.parse(saved).surveyVillageCheck !== false);
+      if (saved) {
+        const s = JSON.parse(saved);
+        setSurveyVillageCheck(s.surveyVillageCheck !== false);
+        setInstallerNewSurvey(s.installerNewSurvey !== false);
+      }
     } catch {
       /* ignore */
     }
@@ -191,9 +198,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const load = () =>
       fetch('/api/settings', { cache: 'no-store' })
         .then((r) => (r.ok ? r.json() : null))
-        .then((s: { surveyVillageCheck?: boolean } | null) => {
+        .then((s: { surveyVillageCheck?: boolean; installerNewSurvey?: boolean } | null) => {
           if (!s || cancelled) return;
           setSurveyVillageCheck(s.surveyVillageCheck !== false);
+          setInstallerNewSurvey(s.installerNewSurvey !== false);
           try {
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
           } catch {
@@ -1515,6 +1523,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         villages,
         refusedChanges,
         surveyVillageCheck,
+        installerNewSurvey,
         clearRefusedChanges: () => setRefusedChanges([]),
         storageFull: mainStorageFull || surveyStorageFull,
         syncState,
