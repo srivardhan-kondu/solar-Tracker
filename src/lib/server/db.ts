@@ -273,6 +273,42 @@ export const applyChanges = async (changes: TableChanges[]) => {
   if (queries.length) await sql.transaction(queries);
 };
 
+/**
+ * An installer takes a home for their own survey, in one transaction with its history line.
+ * - `claim`: give an existing home to them, only if nobody has it yet (two people cannot both get it).
+ * - `add`: a new home, only if no record has its id yet.
+ * Returns the saved home, or null if someone else got there first.
+ */
+export const takeHome = async (
+  how: { claim: { id: string; patch: Record<string, unknown>; installerId: string } } | { add: DbRecord },
+  audit: DbRecord
+): Promise<DbRecord | null> => {
+  await ensureDb();
+  const cols = COLUMNS.consumers;
+  const names = ['id', ...cols.map(([n]) => n), 'data'].join(', ');
+  const exprs = ["r->>'id'", ...cols.map(([, , e]) => e), 'r'].join(', ');
+  const write =
+    'claim' in how
+      ? sql.query(
+          `update consumers set data = data || $2::jsonb, assigned_installer_id = $3, updated_at = now() ` +
+            `where id = $1 and coalesce(assigned_installer_id, '') = '' returning data`,
+          [how.claim.id, JSON.stringify(how.claim.patch), how.claim.installerId]
+        )
+      : sql.query(
+          `insert into consumers (${names}) select ${exprs} from (select $1::jsonb as r) s on conflict (id) do nothing returning data`,
+          [JSON.stringify(how.add)]
+        );
+  // The history line is written only if the home was taken
+  const log = sql.query(
+    `insert into audit_logs (id, ${COLUMNS.audit_logs.map(([n]) => n).join(', ')}, data) ` +
+      `select r->>'id', ${COLUMNS.audit_logs.map(([, , e]) => e).join(', ')}, r from (select $1::jsonb as r) s ` +
+      `where exists (select 1 from consumers where id = $2 and assigned_installer_id = $3)`,
+    [JSON.stringify(audit), 'claim' in how ? how.claim.id : how.add.id, 'claim' in how ? how.claim.installerId : how.add.assignedInstallerId]
+  );
+  const [rows] = (await sql.transaction([write, log])) as [{ data: DbRecord }[], unknown];
+  return rows[0]?.data ?? null;
+};
+
 /** Add a person and their sign-in PIN together (both or neither) */
 export const createUserWithPin = async (user: DbRecord, pinHash: string) => {
   await ensureDb();

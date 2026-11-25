@@ -116,7 +116,24 @@ interface AppContextType {
   updateConsumerMobile: (consumerNumber: string, newMobile: string) => { success: boolean; message: string };
   /** Office only: send a survey back to the installer to be done again */
   reopenSurvey: (consumerNumber: string, reason: string) => { success: boolean; message: string };
+  /**
+   * Installer: start a survey on a home the office has not given them. Needs internet.
+   * Pass `details` only for a home that is not in the office's list.
+   */
+  startOwnSurvey: (consumerNumber: string, details?: NewHomeDetails) => Promise<StartOwnSurveyResult>;
 }
+
+export interface NewHomeDetails {
+  name: string;
+  mobile: string;
+  villageId: string;
+}
+
+export type StartOwnSurveyResult =
+  | { ok: true; consumer: Consumer; added: boolean; alreadyYours: boolean }
+  /** Not in the office's list: ask for the home's details */
+  | { ok: false; notFound: true }
+  | { ok: false; message: string; field?: keyof NewHomeDetails | 'consumerNumber' };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -711,7 +728,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const map = new Map(prev.map((c) => [c.consumerNumber, c]));
       newConsumers.forEach((nc) => {
         if (map.has(nc.consumerNumber)) {
-          map.set(nc.consumerNumber, { ...map.get(nc.consumerNumber)!, ...nc });
+          // Update the details but keep the same record, its progress and who it is given to
+          // (it may be a home an installer added and is already surveying)
+          const old = map.get(nc.consumerNumber)!;
+          map.set(nc.consumerNumber, { ...old, ...nc, id: old.id, status: old.status, addedByInstaller: undefined });
           updated++;
         } else {
           map.set(nc.consumerNumber, nc);
@@ -775,6 +795,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             assignedInstallerName: installer.name,
             assignedDate: new Date().toLocaleDateString('en-CA'),
             status: c.status === 'Assigned' ? 'Assigned' : c.status,
+            // The office has decided now, so it no longer counts as taken by the installer
+            selfAssigned: undefined,
           };
         }
         return c;
@@ -1282,6 +1304,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: t('Survey reopened. It is back on the installer\'s Site Survey list.') };
   };
 
+  const startOwnSurvey = async (consumerNumber: string, details?: NewHomeDetails): Promise<StartOwnSurveyResult> => {
+    const noInternet = {
+      ok: false as const,
+      message: t('No internet. You need internet to start a new survey. Once it has started you can carry on without internet.'),
+    };
+    if (!isOnline || (typeof navigator !== 'undefined' && !navigator.onLine)) return noInternet;
+    let body: { consumer?: Consumer; added?: boolean; alreadyYours?: boolean; notFound?: boolean; problem?: string; field?: keyof NewHomeDetails | 'consumerNumber'; error?: string };
+    try {
+      const res = await fetch('/api/surveys/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ consumerNumber, details }),
+      });
+      body = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, message: t('Could not start the survey. Please try again.') };
+    } catch {
+      return noInternet;
+    }
+    if (body.notFound) return { ok: false, notFound: true };
+    if (body.problem || !body.consumer) return { ok: false, message: t(body.problem || 'Could not start the survey. Please try again.'), field: body.field };
+    const home = body.consumer;
+    // Show it at once; the server already has it
+    setConsumers((prev) => [home, ...prev.filter((c) => c.id !== home.id && c.consumerNumber !== home.consumerNumber)]);
+    return { ok: true, consumer: home, added: !!body.added, alreadyYours: !!body.alreadyYours };
+  };
+
   // ---------- Database sync ----------
   const { syncState, reloadAfterReset } = useServerSync({
     collections: {
@@ -1463,6 +1511,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateSurveyDraft,
         submitSurvey,
         reopenSurvey,
+        startOwnSurvey,
         updateConsumerMobile,
       }}
     >

@@ -233,6 +233,11 @@ export const AssignmentView: React.FC = () => {
                       ) : (
                         <span className="font-bold text-amber-700">{t("Not assigned")}</span>
                       )}
+                      {c.selfAssigned && (
+                        <span className="block text-xs font-semibold text-amber-800">
+                          {c.addedByInstaller ? t('Added by installer: check details') : t('Taken by installer')}
+                        </span>
+                      )}
                     </span>
                   </span>
                 </button>
@@ -282,6 +287,11 @@ export const AssignmentView: React.FC = () => {
                         <span className="font-semibold text-slate-900">{c.assignedInstallerName}</span>
                       ) : (
                         <span className="text-amber-700 font-bold">{t("Not assigned")}</span>
+                      )}
+                      {c.selfAssigned && (
+                        <span className="block text-xs font-semibold text-amber-800">
+                          {c.addedByInstaller ? t('Added by installer: check details') : t('Taken by installer')}
+                        </span>
                       )}
                     </td>
                     <td className="py-3 px-4 text-right">

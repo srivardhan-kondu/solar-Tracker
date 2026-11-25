@@ -1,5 +1,6 @@
 import 'server-only';
-import { ensureDb, readAll, applyChanges, sql } from './db';
+import { ensureDb, readAll, applyChanges, sql, takeHome } from './db';
+import { normalizeMobile } from '@/lib/mobile';
 import { AllData, DbRecord, TableChanges, TableName } from '@/lib/tables';
 import { Consumer, Installation, SiteSurvey, User, Village } from '@/types';
 import { checkVillages, formatDistance } from '@/lib/fence';
@@ -241,4 +242,117 @@ export const photoUploadProblem = async (user: User, folder: string, consumerNum
   const rows = (await sql.query(`select data from consumers where consumer_number = $1`, [consumerNumber])) as { data: Consumer }[];
   if (rows[0]?.data.assignedInstallerId !== user.id) return 'This home is not assigned to you';
   return outsideVillagesProblem(user, await allVillages(), [fix]);
+};
+
+/* ---------- Installer starts a survey on their own ---------- */
+
+/** Details an installer types for a home that is not in the office's list */
+export interface NewHomeDetails {
+  name: string;
+  mobile: string;
+  villageId: string;
+}
+
+export type TakeHomeResult =
+  | { consumer: Consumer; added: boolean; alreadyYours: boolean }
+  /** Not in the office's list: ask the installer for the home's details */
+  | { notFound: true }
+  | { problem: string; field?: keyof NewHomeDetails | 'consumerNumber' };
+
+const TAKEN = 'This home is already given to another installer. Ask the office if it should be yours.';
+const CLOSED_STATUSES = ['Completed', 'Received by Server', 'Saved Locally', 'Waiting to Sync', 'Needs Review'];
+
+/** Consumer numbers are compared without spaces or letter case, so "ap-gnt 001" finds "AP-GNT-001" */
+export const cleanConsumerNumber = (s: string) => s.trim().replace(/\s+/g, ' ').toUpperCase();
+const sameKey = (s: string) => s.replace(/[\s-]/g, '').toUpperCase();
+
+const findHome = async (consumerNumber: string) => {
+  const rows = (await sql.query(
+    `select data from consumers where upper(regexp_replace(consumer_number, '[\\s-]', '', 'g')) = $1 order by seq asc limit 1`,
+    [sameKey(consumerNumber)]
+  )) as { data: Consumer }[];
+  return rows[0]?.data ?? null;
+};
+
+const istNow = () => new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' });
+const istToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
+const auditFor = (user: User, consumerNumber: string, details: string): DbRecord => ({
+  id: `aud_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+  actorName: user.name,
+  actorRole: user.role,
+  action: 'SELF_ASSIGN_SURVEY',
+  recordType: 'Assignment',
+  recordId: consumerNumber,
+  timestamp: istNow(),
+  details,
+});
+
+/**
+ * An installer starts a survey on a home the office has not given them.
+ * - Home in the office's list and given to nobody: it becomes theirs.
+ * - Home given to another installer: refused.
+ * - Home not in the list: with `details` it is added and given to them; without, `notFound`.
+ */
+export const takeHomeForSurvey = async (user: User, rawNumber: string, details?: NewHomeDetails): Promise<TakeHomeResult> => {
+  await ensureDb();
+  const consumerNumber = cleanConsumerNumber(rawNumber);
+  if (consumerNumber.length < 3 || consumerNumber.length > 40)
+    return { problem: 'Please type the consumer number from the electricity bill.', field: 'consumerNumber' };
+
+  const villages = await allVillages();
+  const mine = villagesOf(user, villages);
+  if (!mine.length) return { problem: 'The office has not given you any villages yet. Ask them to add your villages first.' };
+
+  const home = await findHome(consumerNumber);
+  if (home) {
+    if (home.assignedInstallerId === user.id) return { consumer: home, added: false, alreadyYours: true };
+    if (home.assignedInstallerId) return { problem: TAKEN };
+    if (CLOSED_STATUSES.includes(home.status)) return { problem: 'This home has already been installed. Ask the office if it needs another visit.' };
+    const patch = { assignedInstallerId: user.id, assignedInstallerName: user.name, assignedDate: istToday(), selfAssigned: true };
+    const saved = await takeHome(
+      { claim: { id: home.id, patch, installerId: user.id } },
+      auditFor(user, home.consumerNumber, `${user.name} started a site survey on their own and took ${home.consumerNumber} (${home.name}, ${home.village}).`)
+    );
+    if (saved) return { consumer: saved as unknown as Consumer, added: false, alreadyYours: false };
+    // Someone else took it a moment ago
+    const now = await findHome(consumerNumber);
+    return now?.assignedInstallerId === user.id ? { consumer: now, added: false, alreadyYours: true } : { problem: TAKEN };
+  }
+
+  if (!details) return { notFound: true };
+
+  const name = details.name.trim().replace(/\s+/g, ' ');
+  if (name.length < 2 || name.length > 100) return { problem: 'Please type the name on the electricity bill.', field: 'name' };
+  const mobile = normalizeMobile(details.mobile);
+  if (!mobile) return { problem: 'Please enter a valid 10-digit mobile number (starting with 6, 7, 8 or 9).', field: 'mobile' };
+  const village = mine.find((v) => v.id === details.villageId);
+  if (!village) return { problem: 'Please choose one of your villages.', field: 'villageId' };
+
+  const consumer: Consumer = {
+    // Built from the number, so two people adding the same new home at once cannot make two records
+    id: `c_field_${sameKey(consumerNumber).replace(/[^A-Z0-9]/g, '_')}`,
+    consumerNumber,
+    name,
+    mobile,
+    village: village.name,
+    mandal: village.mandal ?? '',
+    district: village.district ?? user.district ?? '',
+    division: user.division ?? '',
+    ula: '',
+    status: 'Assigned',
+    assignedInstallerId: user.id,
+    assignedInstallerName: user.name,
+    assignedDate: istToday(),
+    capacityKw: 3.3,
+    selfAssigned: true,
+    addedByInstaller: true,
+  };
+  const saved = await takeHome(
+    { add: consumer as unknown as DbRecord },
+    auditFor(user, consumerNumber, `${user.name} added a new home that was not in the consumer list: ${consumerNumber} (${name}, ${villageLabel(village)}, ${mobile}), and started its site survey.`)
+  );
+  if (saved) return { consumer: saved as unknown as Consumer, added: true, alreadyYours: false };
+  const now = await findHome(consumerNumber);
+  return now?.assignedInstallerId === user.id ? { consumer: now, added: false, alreadyYours: true } : { problem: TAKEN };
 };

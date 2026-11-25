@@ -266,6 +266,11 @@ export const ConsumerSearchView: React.FC<{
                       </td>
                       <td className="py-4 px-4 text-slate-800">
                         {c.assignedInstallerName || <span className="text-amber-700 font-semibold">{t("Not assigned")}</span>}
+                        {c.selfAssigned && (
+                        <span className="block text-xs font-semibold text-amber-800">
+                          {c.addedByInstaller ? t('Added by installer: check details') : t('Taken by installer')}
+                        </span>
+                      )}
                       </td>
                       <td className="py-4 px-4">
                         <span

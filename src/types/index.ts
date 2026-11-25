@@ -115,6 +115,10 @@ export interface Consumer {
   previousMobile?: string;
   mobileUpdatedBy?: string;
   mobileUpdatedAt?: string;
+  /** The installer started a survey here on their own, without the office assigning the home */
+  selfAssigned?: boolean;
+  /** The installer added this home: it was not in the office's consumer list. The office should check its details. */
+  addedByInstaller?: boolean;
 }
 
 export interface EquipmentInventory {

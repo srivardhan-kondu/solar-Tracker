@@ -8,6 +8,7 @@ import {
   Camera,
   CheckCircle2,
   ClipboardCheck,
+  Plus,
   Send,
   Trash2,
   X,
@@ -30,6 +31,7 @@ import {
 import { CameraCapture } from '@/components/camera/CameraCapture';
 import { PhotoVerification } from '@/components/camera/PhotoVerification';
 import { consumerAddress, formatGeo, hasGeo, mapsLink } from '@/lib/geoPhoto';
+import { villageLabel, villagesOf } from '@/lib/workArea';
 import { ConsentSection } from './ConsentForm';
 import { DecisionBadge, LabelledPhoto, ReopenedNotice, ReopenSurveyControl, SurveySummary } from './SurveySummary';
 
@@ -185,6 +187,169 @@ const ChoiceGrid = <V extends string>({
   );
 };
 
+/* ---------- Installer starts a survey on their own ---------- */
+
+const fieldCls = 'w-full px-4 py-3 bg-white border-2 rounded-xl text-base';
+
+/**
+ * Any home, without waiting for the office: type the consumer number.
+ * In the office's list and free → it becomes yours. Not in the list → type its details and add it.
+ * Homes given to another installer are refused.
+ */
+const StartNewSurvey: React.FC<{ onStarted: (consumerNumber: string, message: string) => void }> = ({ onStarted }) => {
+  const { t } = useLang();
+  const { startOwnSurvey, villages, currentUser } = useApp();
+  const myVillages = villagesOf(currentUser, villages);
+  const [number, setNumber] = useState('');
+  const [askDetails, setAskDetails] = useState(false);
+  const [name, setName] = useState('');
+  const [mobile, setMobile] = useState('');
+  const [villageId, setVillageId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<{ message: string; field?: string } | null>(null);
+
+  const reset = () => {
+    setAskDetails(false);
+    setName('');
+    setMobile('');
+    setVillageId('');
+    setError(null);
+  };
+
+  const go = async (withDetails: boolean) => {
+    if (busy) return;
+    if (!number.trim()) {
+      setError({ message: t('Please type the consumer number from the electricity bill.'), field: 'consumerNumber' });
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const res = await startOwnSurvey(number, withDetails ? { name, mobile, villageId } : undefined);
+    setBusy(false);
+    if (res.ok) {
+      onStarted(
+        res.consumer.consumerNumber,
+        res.alreadyYours
+          ? t('This home is already on your list.')
+          : res.added
+          ? t('New home added. The office has been told. Start the survey below.')
+          : t('This home is now yours. Start the survey below.')
+      );
+      setNumber('');
+      reset();
+      return;
+    }
+    if ('notFound' in res) {
+      setAskDetails(true);
+      return;
+    }
+    setError({ message: res.message, field: res.field });
+  };
+
+  const border = (f: string) => (error?.field === f ? 'border-red-400' : 'border-slate-300');
+
+  return (
+    <div className="bg-white rounded-2xl border-2 border-brand-200 p-4 sm:p-5 space-y-4">
+      <div>
+        <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+          <Plus className="w-5 h-5 text-brand-600" />
+          {t('Start a new survey')}
+        </h2>
+        <p className="text-sm text-slate-600 mt-0.5">
+          {t('Survey any home, even if the office has not given it to you. Type the consumer number from the electricity bill.')}
+        </p>
+      </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void go(askDetails);
+        }}
+        className="space-y-4"
+      >
+        <label className="block space-y-1.5 max-w-md">
+          <span className="text-base font-bold text-slate-800">{t('Consumer number')}</span>
+          <input
+            value={number}
+            onChange={(e) => {
+              setNumber(e.target.value);
+              if (askDetails) reset();
+              else setError(null);
+            }}
+            autoCapitalize="characters"
+            autoComplete="off"
+            placeholder={t('e.g. AP-GNT-2026-001')}
+            className={`${fieldCls} font-mono ${border('consumerNumber')}`}
+          />
+        </label>
+
+        {askDetails && (
+          <div className="space-y-4 border-t border-slate-200 pt-4">
+            <div className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-start gap-2" role="status">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              {t('This home is not in the office list. Check the number on the bill. If it is right, add the home below.')}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <label className="block space-y-1.5">
+                <span className="text-base font-bold text-slate-800">{t('Name on the bill')}</span>
+                <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" className={`${fieldCls} ${border('name')}`} />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-base font-bold text-slate-800">{t('Mobile number')}</span>
+                <input
+                  value={mobile}
+                  onChange={(e) => setMobile(e.target.value)}
+                  inputMode="tel"
+                  autoComplete="off"
+                  placeholder="98765 43210"
+                  className={`${fieldCls} ${border('mobile')}`}
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-base font-bold text-slate-800">{t('Village')}</span>
+                <select value={villageId} onChange={(e) => setVillageId(e.target.value)} className={`${fieldCls} ${border('villageId')}`}>
+                  <option value="">{t('Choose village')}</option>
+                  {myVillages.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {villageLabel(v)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-base font-semibold text-red-900 flex items-start gap-2" role="alert">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            {error.message}
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button type="submit" disabled={busy} className={btnPrimary}>
+            {busy ? t('Please wait…') : askDetails ? t('Add home and start survey') : t('Find home')}
+            {!busy && <ArrowRight className="w-5 h-5" />}
+          </button>
+          {askDetails && (
+            <button
+              type="button"
+              onClick={() => {
+                setNumber('');
+                reset();
+              }}
+              className={btnBack}
+            >
+              {t('Cancel')}
+            </button>
+          )}
+        </div>
+      </form>
+    </div>
+  );
+};
+
 /* ---------- Screen ---------- */
 
 export const SurveyView: React.FC<{ onGoToInstallation: () => void }> = ({ onGoToInstallation }) => {
@@ -284,6 +449,15 @@ export const SurveyView: React.FC<{ onGoToInstallation: () => void }> = ({ onGoT
 
         {storageWarning}
 
+        {currentUser.role === 'Installer' && (
+          <StartNewSurvey
+            onStarted={(num, msg) => {
+              open(num);
+              setListMsg(msg);
+            }}
+          />
+        )}
+
         {listMsg && (
           <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-base font-semibold text-emerald-900 flex items-center gap-2" role="status">
             <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
@@ -295,7 +469,9 @@ export const SurveyView: React.FC<{ onGoToInstallation: () => void }> = ({ onGoT
           <h2 className="text-lg font-bold text-slate-900">{t('Homes to survey ({n})', { n: toSurvey.length })}</h2>
           {toSurvey.length === 0 ? (
             <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-base text-slate-600">
-              {t('No homes are waiting for a survey. Ask the office if you expected one.')}
+              {currentUser.role === 'Installer'
+                ? t('No homes are waiting for a survey. Use "Start a new survey" above to survey any home.')
+                : t('No homes are waiting for a survey. Ask the office if you expected one.')}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -382,6 +558,20 @@ export const SurveyView: React.FC<{ onGoToInstallation: () => void }> = ({ onGoT
         </div>
         {isSent && <DecisionBadge decision={survey?.decision} large />}
       </div>
+      {consumer?.addedByInstaller && (
+        <div className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          {isOfficeRole(currentUser.role)
+            ? t('Added by the installer: this home was not in the consumer list. Please check its details.')
+            : t('You added this home. The office will check its details.')}
+        </div>
+      )}
+      {listMsg && (
+        <div className="text-base font-semibold text-emerald-900 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 flex items-center gap-2" role="status">
+          <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+          {listMsg}
+        </div>
+      )}
     </div>
   );
 
